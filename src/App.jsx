@@ -152,7 +152,7 @@ function LeadForm({ onSave, onClose, editLead }) {
     dueDate.setHours(10, 0, 0, 0);
     onSave(
       { name: f.name.trim(), phone: f.phone, email: f.email, service: f.service, source: f.source, notes: f.notes, amount: f.amount ? Number(f.amount) : 0, status: "new" },
-      addFollowup ? { title: `פולואפ — ${f.name.trim()}`, type: "followup", due_date: dueDate.toISOString(), completed: false } : null
+      addFollowup ? { title: `פולואפ`, type: "followup", due_date: dueDate.toISOString(), completed: false } : null
     );
     onClose();
   };
@@ -349,7 +349,7 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
                   <>
                     <span style={{ fontSize: 13, flex: 1, textDecoration: t.completed ? "line-through" : "none" }}>{tt?.icon} {t.title}</span>
                     <span style={{ fontSize: 11, color: overdue ? "#EF4444" : "#475569", whiteSpace: "nowrap" }}>{formatDate(t.due_date)}</span>
-                    <button onClick={() => sendToCalendar(t.title, t.due_date, `ליד: ${lead.name}\n${lead.phone || ""}`)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
+                    <button onClick={() => sendToCalendar(`${lead.name} — ${t.title}`, t.due_date, `טלפון: ${lead.phone || ""}`)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
                     <button onClick={() => { setEditingTask(t.id); setEditTaskText(t.title); }} style={{ ...S.iconBtn, color: "#64748B" }} title="ערוך">{I.edit}</button>
                     <button onClick={() => { if (confirm("למחוק משימה?")) onDeleteTask(t.id); }} style={{ ...S.iconBtn, color: "#64748B" }} title="מחק">{I.trash}</button>
                   </>
@@ -400,7 +400,7 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
         </div>
       </div>
 
-      {showTaskForm && <TaskForm leadId={lead.id} leadName={lead.name} onSave={async (t, addToCal) => { await onAddTask(t); if (addToCal) sendToCalendar(t.title, t.due_date, `ליד: ${lead.name}\n${lead.phone || ""}`); setShowTaskForm(false); }} onClose={() => setShowTaskForm(false)} />}
+      {showTaskForm && <TaskForm leadId={lead.id} leadName={lead.name} onSave={async (t, addToCal) => { await onAddTask(t); if (addToCal) sendToCalendar(`${lead.name} — ${t.title}`, t.due_date, `טלפון: ${lead.phone || ""}`); setShowTaskForm(false); }} onClose={() => setShowTaskForm(false)} />}
     </div>
   );
 }
@@ -455,7 +455,7 @@ function TasksView({ tasks, leads, onToggle, onDelete }) {
           {lead && <div style={{ fontSize: 11, color: "#475569" }}>{lead.name}</div>}
         </div>
         <span style={{ fontSize: 11, color: overdue ? "#EF4444" : "#475569", whiteSpace: "nowrap" }}>{daysAgo(t.due_date)}</span>
-        <button onClick={() => sendToCalendar(t.title, t.due_date, lead ? `ליד: ${lead.name}` : "")} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
+        <button onClick={() => sendToCalendar(lead ? `${lead.name} — ${t.title}` : t.title, t.due_date, lead ? `טלפון: ${lead.phone || ""}` : "")} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
         <button onClick={() => onDelete(t.id)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
       </div>
     );
@@ -520,7 +520,7 @@ export default function App() {
         const [task] = await sb("tasks", "POST", { ...followupTask, lead_id: created.id });
         setTasks(p => [...p, task]);
         // הוסף ישר ליומן
-        sendToCalendar(followupTask.title, followupTask.due_date, `ליד: ${lead.name}\nטלפון: ${lead.phone || "—"}\nשירות: ${lead.service || "—"}`);
+        sendToCalendar(`${lead.name} — ${followupTask.title}`, followupTask.due_date, `טלפון: ${lead.phone || "—"}\nשירות: ${lead.service || "—"}`);
       }
     } catch (e) { setError(e.message); }
   };
