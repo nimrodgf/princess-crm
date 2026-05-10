@@ -4,6 +4,23 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const SUPABASE_URL = "https://lbqscxwfttiduofjjmyt.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxicXNjeHdmdHRpZHVvZmpqbXl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MzUwNTksImV4cCI6MjA5NDAxMTA1OX0.pPFtxoO5UhRt_UFxJxFOy8zbwLK4OXnk6lxRUGhZack";
 
+// ─── Google Calendar Script ───
+const GCAL_URL = "https://script.google.com/macros/s/AKfycbyFyUmXAmlQCuZHgtAKu_0Zc_b3eEDf_u32oCYdNqLAK6t3ktlNktf2tJ-hPhvXgq8N9w/exec";
+
+async function addToCalendar(title, startDate, description = "") {
+  try {
+    const res = await fetch(GCAL_URL, {
+      method: "POST",
+      body: JSON.stringify({ title, start: startDate, description, duration: 30 }),
+    });
+    const data = await res.json();
+    return data.success;
+  } catch (e) {
+    console.error("Calendar error:", e);
+    return false;
+  }
+}
+
 const hdrs = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -70,11 +87,27 @@ function daysAgo(d) {
   return `לפני ${diff} ימים`;
 }
 
-function gcalUrl(title, date, details = "") {
-  const d = new Date(date);
-  const fmt = (dt) => dt.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-  const end = new Date(d.getTime() + 30 * 60000);
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${fmt(d)}/${fmt(end)}&details=${encodeURIComponent(details)}`;
+// Toast notification state (global for simplicity)
+let _showToast = () => {};
+function Toast({ message, type }) {
+  if (!message) return null;
+  const bg = type === "success" ? "#10B981" : type === "error" ? "#EF4444" : "#3B82F6";
+  return <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: bg, color: "#fff", padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 600, zIndex: 200, direction: "rtl", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>{message}</div>;
+}
+
+function useToast() {
+  const [toast, setToast] = useState({ message: "", type: "" });
+  _showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast({ message: "", type: "" }), 3000);
+  };
+  return toast;
+}
+
+async function sendToCalendar(title, date, description) {
+  const ok = await addToCalendar(title, date, description);
+  _showToast(ok ? "✓ נוסף ליומן" : "שגיאה בהוספה ליומן", ok ? "success" : "error");
+  return ok;
 }
 
 // ─── Icons ───
@@ -240,7 +273,7 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
                 <button onClick={() => onToggleTask(t.id, !t.completed)} style={{ ...S.iconBtn, color: t.completed ? "#10B981" : "#475569", flexShrink: 0 }}>{t.completed ? I.check : <div style={{ width: 14, height: 14, border: "2px solid #475569", borderRadius: 3 }} />}</button>
                 <span style={{ fontSize: 13, flex: 1, textDecoration: t.completed ? "line-through" : "none" }}>{tt?.icon} {t.title}</span>
                 <span style={{ fontSize: 11, color: overdue ? "#EF4444" : "#475569", whiteSpace: "nowrap" }}>{formatDate(t.due_date)}</span>
-                <a href={gcalUrl(t.title, t.due_date, `ליד: ${lead.name}\n${lead.phone || ""}`)} target="_blank" rel="noreferrer" style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</a>
+                <button onClick={() => sendToCalendar(t.title, t.due_date, `ליד: ${lead.name}\n${lead.phone || ""}`)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
                 <button onClick={() => onDeleteTask(t.id)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
               </div>
             );
@@ -329,7 +362,7 @@ function TasksView({ tasks, leads, onToggle, onDelete }) {
           {lead && <div style={{ fontSize: 11, color: "#475569" }}>{lead.name}</div>}
         </div>
         <span style={{ fontSize: 11, color: overdue ? "#EF4444" : "#475569", whiteSpace: "nowrap" }}>{daysAgo(t.due_date)}</span>
-        <a href={gcalUrl(t.title, t.due_date, lead ? `ליד: ${lead.name}` : "")} target="_blank" rel="noreferrer" style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</a>
+        <button onClick={() => sendToCalendar(t.title, t.due_date, lead ? `ליד: ${lead.name}` : "")} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
         <button onClick={() => onDelete(t.id)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
       </div>
     );
@@ -364,6 +397,7 @@ export default function App() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [search, setSearch] = useState("");
   const [dragId, setDragId] = useState(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -392,8 +426,8 @@ export default function App() {
       if (followupTask && created) {
         const [task] = await sb("tasks", "POST", { ...followupTask, lead_id: created.id });
         setTasks(p => [...p, task]);
-        // Open Google Calendar for the followup
-        window.open(gcalUrl(followupTask.title, followupTask.due_date, `ליד: ${lead.name}\nטלפון: ${lead.phone || "—"}\nשירות: ${lead.service || "—"}`), "_blank");
+        // הוסף ישר ליומן
+        sendToCalendar(followupTask.title, followupTask.due_date, `ליד: ${lead.name}\nטלפון: ${lead.phone || "—"}\nשירות: ${lead.service || "—"}`);
       }
     } catch (e) { setError(e.message); }
   };
@@ -459,6 +493,7 @@ export default function App() {
     return (
       <div style={S.app}>
         <LeadDetail lead={fresh} interactions={interactions} tasks={tasks} onBack={() => setSelectedLead(null)} onUpdate={updateLead} onDelete={deleteLead} onAddInteraction={addInteraction} onAddTask={addTask} onToggleTask={toggleTask} onDeleteTask={deleteTask} />
+        <Toast {...toast} />
       </div>
     );
   }
@@ -544,6 +579,7 @@ export default function App() {
       {view === "stats" && <Stats leads={leads} />}
 
       {showForm && <LeadForm onSave={addLead} onClose={() => setShowForm(false)} />}
+      <Toast {...toast} />
     </div>
   );
 }
