@@ -49,7 +49,7 @@ const STATUSES = [
   { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" },
 ];
 
-const SERVICES = ["הקלטה", "מיקס", "הפקה", "לייב סשן בשדה", "אימון ווקאלי", "פודקאסט", "צילום", "אחר"];
+const SERVICES = ["הקלטה", "מיקס", "הפקה", "לייב סשן", "פודקאסט", "צילום קורס", "השכרת חלל", "בית ריק", "אחר"];
 const SOURCES = ["אינסטגרם", "המלצה", "גוגל", "פייסבוק", "אתר", "חוזר/ת", "אחר"];
 const TASK_TYPES = [
   { id: "followup", label: "פולואפ", icon: "📞" },
@@ -193,12 +193,16 @@ function LeadForm({ onSave, onClose, editLead }) {
 // ─── Task Form ───
 function TaskForm({ leadId, leadName, onSave, onClose }) {
   const [f, setF] = useState({ title: "", type: "followup", due_date: "", due_time: "10:00" });
+  const [addToCal, setAddToCal] = useState(true);
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
   const submit = () => {
     if (!f.title.trim() || !f.due_date) return;
     const dt = new Date(`${f.due_date}T${f.due_time || "10:00"}`);
-    onSave({ lead_id: leadId, title: f.title.trim(), type: f.type, due_date: dt.toISOString(), completed: false });
+    onSave(
+      { lead_id: leadId, title: f.title.trim(), type: f.type, due_date: dt.toISOString(), completed: false },
+      addToCal
+    );
     onClose();
   };
 
@@ -212,6 +216,10 @@ function TaskForm({ leadId, leadName, onSave, onClose }) {
           <div><label style={S.lbl}>תאריך *</label><input style={S.inp} type="date" value={f.due_date} onChange={e => set("due_date", e.target.value)} dir="ltr" /></div>
           <div><label style={S.lbl}>שעה</label><input style={S.inp} type="time" value={f.due_time} onChange={e => set("due_time", e.target.value)} dir="ltr" /></div>
         </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94A3B8", cursor: "pointer", paddingTop: 4, borderTop: "1px solid #334155" }}>
+          <input type="checkbox" checked={addToCal} onChange={e => setAddToCal(e.target.checked)} style={{ accentColor: "#3B82F6", width: 16, height: 16 }} />
+          הוסף ליומן גוגל
+        </label>
       </div>
       <div style={S.mFoot}>
         <button style={S.btn2} onClick={onClose}>ביטול</button>
@@ -225,6 +233,7 @@ function TaskForm({ leadId, leadName, onSave, onClose }) {
 function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onAddInteraction, onUpdateInteraction, onDeleteInteraction, onAddTask, onUpdateTask, onToggleTask, onDeleteTask }) {
   const [noteText, setNoteText] = useState("");
   const [noteType, setNoteType] = useState("note");
+  const [noteDate, setNoteDate] = useState(new Date().toISOString().split("T")[0]);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -247,8 +256,9 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
 
   const addNote = async () => {
     if (!noteText.trim()) return;
-    await onAddInteraction({ lead_id: lead.id, text: noteText.trim(), type: noteType, date: new Date().toISOString() });
+    await onAddInteraction({ lead_id: lead.id, text: noteText.trim(), type: noteType, date: new Date(noteDate + "T12:00:00").toISOString() });
     setNoteText("");
+    setNoteDate(new Date().toISOString().split("T")[0]);
   };
 
   const startEditInteraction = (i) => {
@@ -355,9 +365,10 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
       <div style={S.section}>
         <h3 style={S.secTitle}>💬 אינטראקציות ({leadInteractions.length})</h3>
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          <select style={{ ...S.inp, width: 100, padding: "6px 8px", fontSize: 12 }} value={noteType} onChange={e => setNoteType(e.target.value)}>
+          <select style={{ ...S.inp, width: 90, padding: "6px 8px", fontSize: 12 }} value={noteType} onChange={e => setNoteType(e.target.value)}>
             {INTERACTION_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
+          <input style={{ ...S.inp, width: 120, padding: "6px 8px", fontSize: 12 }} type="date" value={noteDate} onChange={e => setNoteDate(e.target.value)} dir="ltr" />
           <input style={{ ...S.inp, flex: 1 }} value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="הוסף אינטראקציה..." onKeyDown={e => e.key === "Enter" && addNote()} />
           <button style={S.btn1} onClick={addNote} disabled={!noteText.trim()}>הוסף</button>
         </div>
@@ -389,7 +400,7 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
         </div>
       </div>
 
-      {showTaskForm && <TaskForm leadId={lead.id} leadName={lead.name} onSave={async (t) => { await onAddTask(t); setShowTaskForm(false); }} onClose={() => setShowTaskForm(false)} />}
+      {showTaskForm && <TaskForm leadId={lead.id} leadName={lead.name} onSave={async (t, addToCal) => { await onAddTask(t); if (addToCal) sendToCalendar(t.title, t.due_date, `ליד: ${lead.name}\n${lead.phone || ""}`); setShowTaskForm(false); }} onClose={() => setShowTaskForm(false)} />}
     </div>
   );
 }
