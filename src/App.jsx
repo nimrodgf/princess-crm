@@ -119,6 +119,7 @@ const I = {
   trash: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>,
   cal: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  edit: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
 };
 
 // ─── Modal ───
@@ -131,9 +132,14 @@ function Modal({ children, onClose }) {
 }
 
 // ─── Lead Form ───
-function LeadForm({ onSave, onClose }) {
-  const [f, setF] = useState({ name: "", phone: "", email: "", service: "", source: "", notes: "", amount: "" });
-  const [addFollowup, setAddFollowup] = useState(true);
+function LeadForm({ onSave, onClose, editLead }) {
+  const isEdit = !!editLead;
+  const [f, setF] = useState({
+    name: editLead?.name || "", phone: editLead?.phone || "", email: editLead?.email || "",
+    service: editLead?.service || "", source: editLead?.source || "",
+    notes: editLead?.notes || "", amount: editLead?.amount || "",
+  });
+  const [addFollowup, setAddFollowup] = useState(!isEdit);
   const [followupDays, setFollowupDays] = useState(2);
   const ref = useRef();
   useEffect(() => { ref.current?.focus(); }, []);
@@ -216,15 +222,43 @@ function TaskForm({ leadId, leadName, onSave, onClose }) {
 }
 
 // ─── Lead Detail ───
-function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onAddInteraction, onAddTask, onToggleTask, onDeleteTask }) {
+function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onAddInteraction, onUpdateInteraction, onDeleteInteraction, onAddTask, onUpdateTask, onToggleTask, onDeleteTask }) {
   const [noteText, setNoteText] = useState("");
   const [noteType, setNoteType] = useState("note");
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editingInteraction, setEditingInteraction] = useState(null);
+  const [editInterText, setEditInterText] = useState("");
+  const [editingTask, setEditingTask] = useState(null);
+  const [editTaskText, setEditTaskText] = useState("");
+
+  const startEdit = () => {
+    setEditForm({ name: lead.name, phone: lead.phone || "", email: lead.email || "", service: lead.service || "", source: lead.source || "", notes: lead.notes || "", amount: lead.amount || 0 });
+    setEditing(true);
+  };
+
+  const saveEdit = () => {
+    onUpdate(lead.id, { ...editForm, amount: Number(editForm.amount) || 0 });
+    setEditing(false);
+  };
+
+  const ef = (k, v) => setEditForm(p => ({ ...p, [k]: v }));
 
   const addNote = async () => {
     if (!noteText.trim()) return;
     await onAddInteraction({ lead_id: lead.id, text: noteText.trim(), type: noteType, date: new Date().toISOString() });
     setNoteText("");
+  };
+
+  const startEditInteraction = (i) => {
+    setEditingInteraction(i.id);
+    setEditInterText(i.text);
+  };
+
+  const saveInteraction = (id) => {
+    if (editInterText.trim()) onUpdateInteraction(id, { text: editInterText.trim() });
+    setEditingInteraction(null);
   };
 
   const leadTasks = tasks.filter(t => t.lead_id === lead.id).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
@@ -234,8 +268,31 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
     <div style={S.detail}>
       <div style={S.detailTop}>
         <button style={S.backBtn} onClick={onBack}>{I.back} חזרה</button>
-        <button style={{ ...S.iconBtn, color: "#EF4444" }} onClick={() => { if (confirm("למחוק את הליד וכל המידע שלו?")) { onDelete(lead.id); onBack(); } }}>{I.trash}</button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button style={{ ...S.iconBtn, color: "#8B5CF6" }} onClick={startEdit} title="ערוך ליד">{I.edit}</button>
+          <button style={{ ...S.iconBtn, color: "#EF4444" }} onClick={() => { if (confirm("למחוק את הליד וכל המידע שלו?")) { onDelete(lead.id); onBack(); } }}>{I.trash}</button>
+        </div>
       </div>
+
+      {/* Edit Form */}
+      {editing && (
+        <Modal onClose={() => setEditing(false)}>
+          <div style={S.mHead}><h2 style={S.mTitle}>עריכת ליד</h2><button style={S.iconBtn} onClick={() => setEditing(false)}>{I.x}</button></div>
+          <div style={S.grid2}>
+            <div style={S.full}><label style={S.lbl}>שם</label><input style={S.inp} value={editForm.name} onChange={e => ef("name", e.target.value)} /></div>
+            <div><label style={S.lbl}>טלפון</label><input style={S.inp} value={editForm.phone} onChange={e => ef("phone", e.target.value)} dir="ltr" /></div>
+            <div><label style={S.lbl}>אימייל</label><input style={S.inp} value={editForm.email} onChange={e => ef("email", e.target.value)} dir="ltr" /></div>
+            <div><label style={S.lbl}>שירות</label><select style={S.inp} value={editForm.service} onChange={e => ef("service", e.target.value)}><option value="">בחר...</option>{SERVICES.map(s => <option key={s}>{s}</option>)}</select></div>
+            <div><label style={S.lbl}>מקור פנייה</label><select style={S.inp} value={editForm.source} onChange={e => ef("source", e.target.value)}><option value="">בחר...</option>{SOURCES.map(s => <option key={s}>{s}</option>)}</select></div>
+            <div><label style={S.lbl}>סכום (₪)</label><input style={S.inp} type="number" value={editForm.amount} onChange={e => ef("amount", e.target.value)} dir="ltr" /></div>
+            <div style={S.full}><label style={S.lbl}>הערות</label><textarea style={{ ...S.inp, minHeight: 60, resize: "vertical" }} value={editForm.notes} onChange={e => ef("notes", e.target.value)} /></div>
+          </div>
+          <div style={S.mFoot}>
+            <button style={S.btn2} onClick={() => setEditing(false)}>ביטול</button>
+            <button style={S.btn1} onClick={saveEdit}>שמור שינויים</button>
+          </div>
+        </Modal>
+      )}
 
       <div style={S.detailCard}>
         <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>{lead.name}</h2>
@@ -268,13 +325,25 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
           {leadTasks.map(t => {
             const tt = TASK_TYPES.find(x => x.id === t.type);
             const overdue = !t.completed && new Date(t.due_date) < new Date();
+            const isEditingT = editingTask === t.id;
             return (
               <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#0F172A", borderRadius: 8, padding: "8px 12px", opacity: t.completed ? 0.5 : 1, borderRight: `3px solid ${overdue ? "#EF4444" : t.completed ? "#10B981" : "#3B82F6"}` }}>
                 <button onClick={() => onToggleTask(t.id, !t.completed)} style={{ ...S.iconBtn, color: t.completed ? "#10B981" : "#475569", flexShrink: 0 }}>{t.completed ? I.check : <div style={{ width: 14, height: 14, border: "2px solid #475569", borderRadius: 3 }} />}</button>
-                <span style={{ fontSize: 13, flex: 1, textDecoration: t.completed ? "line-through" : "none" }}>{tt?.icon} {t.title}</span>
-                <span style={{ fontSize: 11, color: overdue ? "#EF4444" : "#475569", whiteSpace: "nowrap" }}>{formatDate(t.due_date)}</span>
-                <button onClick={() => sendToCalendar(t.title, t.due_date, `ליד: ${lead.name}\n${lead.phone || ""}`)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
-                <button onClick={() => onDeleteTask(t.id)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
+                {isEditingT ? (
+                  <>
+                    <input style={{ ...S.inp, flex: 1, padding: "4px 8px", fontSize: 13 }} value={editTaskText} onChange={e => setEditTaskText(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { onUpdateTask(t.id, { title: editTaskText.trim() }); setEditingTask(null); } if (e.key === "Escape") setEditingTask(null); }} autoFocus />
+                    <button onClick={() => { onUpdateTask(t.id, { title: editTaskText.trim() }); setEditingTask(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                    <button onClick={() => setEditingTask(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 13, flex: 1, textDecoration: t.completed ? "line-through" : "none" }}>{tt?.icon} {t.title}</span>
+                    <span style={{ fontSize: 11, color: overdue ? "#EF4444" : "#475569", whiteSpace: "nowrap" }}>{formatDate(t.due_date)}</span>
+                    <button onClick={() => sendToCalendar(t.title, t.due_date, `ליד: ${lead.name}\n${lead.phone || ""}`)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="הוסף ליומן">{I.cal}</button>
+                    <button onClick={() => { setEditingTask(t.id); setEditTaskText(t.title); }} style={{ ...S.iconBtn, color: "#64748B" }} title="ערוך">{I.edit}</button>
+                    <button onClick={() => { if (confirm("למחוק משימה?")) onDeleteTask(t.id); }} style={{ ...S.iconBtn, color: "#64748B" }} title="מחק">{I.trash}</button>
+                  </>
+                )}
               </div>
             );
           })}
@@ -295,11 +364,24 @@ function LeadDetail({ lead, interactions, tasks, onBack, onUpdate, onDelete, onA
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
           {leadInteractions.map(i => {
             const it = INTERACTION_TYPES.find(x => x.id === i.type);
+            const isEditing = editingInteraction === i.id;
             return (
-              <div key={i.id} style={{ display: "flex", gap: 10, alignItems: "baseline", background: "#0F172A", borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ fontSize: 11, color: "#475569", whiteSpace: "nowrap", minWidth: 60 }}>{formatDate(i.date)}</span>
-                {it && <span style={{ fontSize: 11, color: "#8B5CF6", background: "#8B5CF615", padding: "1px 6px", borderRadius: 4 }}>{it.label}</span>}
-                <span style={{ fontSize: 13, lineHeight: 1.5 }}>{i.text}</span>
+              <div key={i.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ fontSize: 11, color: "#475569", whiteSpace: "nowrap", minWidth: 55 }}>{formatDate(i.date)}</span>
+                {it && <span style={{ fontSize: 11, color: "#8B5CF6", background: "#8B5CF615", padding: "1px 6px", borderRadius: 4, whiteSpace: "nowrap" }}>{it.label}</span>}
+                {isEditing ? (
+                  <>
+                    <input style={{ ...S.inp, flex: 1, padding: "4px 8px", fontSize: 13 }} value={editInterText} onChange={e => setEditInterText(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveInteraction(i.id); if (e.key === "Escape") setEditingInteraction(null); }} autoFocus />
+                    <button onClick={() => saveInteraction(i.id)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                    <button onClick={() => setEditingInteraction(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 13, lineHeight: 1.5, flex: 1 }}>{i.text}</span>
+                    <button onClick={() => startEditInteraction(i)} style={{ ...S.iconBtn, color: "#64748B" }} title="ערוך">{I.edit}</button>
+                    <button onClick={() => { if (confirm("למחוק אינטראקציה?")) onDeleteInteraction(i.id); }} style={{ ...S.iconBtn, color: "#64748B" }} title="מחק">{I.trash}</button>
+                  </>
+                )}
               </div>
             );
           })}
@@ -472,6 +554,13 @@ export default function App() {
     } catch (e) { setError(e.message); }
   };
 
+  const updateTask = async (id, updates) => {
+    try {
+      const [updated] = await sb("tasks", "PATCH", updates, `?id=eq.${id}`);
+      setTasks(p => p.map(t => t.id === id ? updated : t));
+    } catch (e) { setError(e.message); }
+  };
+
   const deleteTask = async (id) => {
     try {
       await sb("tasks", "DELETE", null, `?id=eq.${id}`);
@@ -479,9 +568,29 @@ export default function App() {
     } catch (e) { setError(e.message); }
   };
 
-  const filtered = leads.filter(l =>
-    !search || l.name?.includes(search) || l.phone?.includes(search) || l.service?.includes(search)
-  );
+  const updateInteraction = async (id, updates) => {
+    try {
+      const [updated] = await sb("interactions", "PATCH", updates, `?id=eq.${id}`);
+      setInteractions(p => p.map(i => i.id === id ? updated : i));
+    } catch (e) { setError(e.message); }
+  };
+
+  const deleteInteraction = async (id) => {
+    try {
+      await sb("interactions", "DELETE", null, `?id=eq.${id}`);
+      setInteractions(p => p.filter(i => i.id !== id));
+    } catch (e) { setError(e.message); }
+  };
+
+  const [serviceFilter, setServiceFilter] = useState("");
+  const [taskFilter, setTaskFilter] = useState(false);
+
+  const filtered = leads.filter(l => {
+    if (search && !l.name?.includes(search) && !l.phone?.includes(search) && !l.service?.includes(search)) return false;
+    if (serviceFilter && l.service !== serviceFilter) return false;
+    if (taskFilter && !tasks.some(t => t.lead_id === l.id && !t.completed)) return false;
+    return true;
+  });
 
   if (loading) return <div style={{ ...S.app, display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 24, marginBottom: 8 }}>🎤</div><div style={{ color: "#64748B" }}>טוען CRM...</div></div></div>;
 
@@ -492,7 +601,7 @@ export default function App() {
     if (!fresh) { setSelectedLead(null); return null; }
     return (
       <div style={S.app}>
-        <LeadDetail lead={fresh} interactions={interactions} tasks={tasks} onBack={() => setSelectedLead(null)} onUpdate={updateLead} onDelete={deleteLead} onAddInteraction={addInteraction} onAddTask={addTask} onToggleTask={toggleTask} onDeleteTask={deleteTask} />
+        <LeadDetail lead={fresh} interactions={interactions} tasks={tasks} onBack={() => setSelectedLead(null)} onUpdate={updateLead} onDelete={deleteLead} onAddInteraction={addInteraction} onUpdateInteraction={updateInteraction} onDeleteInteraction={deleteInteraction} onAddTask={addTask} onUpdateTask={updateTask} onToggleTask={toggleTask} onDeleteTask={deleteTask} />
         <Toast {...toast} />
       </div>
     );
@@ -515,6 +624,20 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Filters */}
+      {(view === "board" || view === "list") && (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", padding: "6px 0", alignItems: "center" }}>
+          <button style={!serviceFilter && !taskFilter ? S.filterOn : S.filterOff} onClick={() => { setServiceFilter(""); setTaskFilter(false); }}>הכל ({leads.length})</button>
+          {SERVICES.map(svc => {
+            const count = leads.filter(l => l.service === svc).length;
+            if (count === 0) return null;
+            return <button key={svc} style={serviceFilter === svc ? S.filterOn : S.filterOff} onClick={() => setServiceFilter(serviceFilter === svc ? "" : svc)}>{svc} ({count})</button>;
+          })}
+          <span style={{ width: 1, height: 16, background: "#334155", margin: "0 2px" }} />
+          <button style={taskFilter ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setTaskFilter(!taskFilter)}>📋 יש משימות ({leads.filter(l => tasks.some(t => t.lead_id === l.id && !t.completed)).length})</button>
+        </div>
+      )}
 
       {/* Board */}
       {view === "board" && (
@@ -623,4 +746,6 @@ const S = {
   empty: { fontSize: 13, color: "#334155", textAlign: "center", padding: 16 },
   statCard: { background: "#111827", borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 6 },
   statLbl: { fontSize: 13, color: "#64748B", fontWeight: 500 },
+  filterOff: { background: "#1E293B", border: "none", color: "#64748B", fontSize: 12, padding: "4px 10px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  filterOn: { background: "#8B5CF6", border: "none", color: "#fff", fontSize: 12, padding: "4px 10px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, whiteSpace: "nowrap" },
 };
