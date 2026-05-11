@@ -5,6 +5,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const GCAL_URL = "https://script.google.com/macros/s/AKfycbyFyUmXAmlQCuZHgtAKu_0Zc_b3eEDf_u32oCYdNqLAK6t3ktlNktf2tJ-hPhvXgq8N9w/exec";
 const hdrs = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" };
 async function sb(table, method = "GET", body = null, query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { method, headers: hdrs, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
+async function sbMoneyman(query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { headers: { ...hdrs, "Accept-Profile": "moneyman" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
 async function addToCalendar(title, start, desc = "") { try { const r = await fetch(GCAL_URL, { method: "POST", body: JSON.stringify({ title, start, description: desc, duration: 30 }) }); return (await r.json()).success; } catch { return false; } }
 
 const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
@@ -131,6 +132,35 @@ function useNotifications(leads,tasks,interactions){return useMemo(()=>{const n=
 
 function NotifPanel({notifs,onClose,onSelect}){return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>🔔 התראות ({notifs.length})</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={{display:"flex",flexDirection:"column",gap:4}}>{notifs.map((n,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",background:"#0F172A",borderRadius:8,padding:"10px 12px",cursor:"pointer",borderRight:`3px solid ${n.type==="lead"?"#F59E0B":"#EF4444"}`}} onClick={()=>{onSelect(n.leadId);onClose();}}><span style={{fontSize:14}}>{n.type==="lead"?"⚠️":"⏰"}</span><span style={{fontSize:13,flex:1}}>{n.text}</span></div>)}{notifs.length===0&&<p style={S.empty}>אין התראות 🎉</p>}</div></Modal>);}
 
+function FinancesView(){
+  const [txns,setTxns]=useState([]);const [loading,setLoading]=useState(true);const [month,setMonth]=useState(new Date().toISOString().slice(0,7));const [typeF,setTypeF]=useState("");
+  useEffect(()=>{setLoading(true);sbMoneyman(`?order=activity_date.desc&limit=500`).then(d=>{setTxns(d||[]);setLoading(false);}).catch(()=>setLoading(false));},[]);
+  const months=[...new Set(txns.map(t=>t.activity_date?.slice(0,7)).filter(Boolean))].sort().reverse();
+  const filtered=txns.filter(t=>{if(month&&!t.activity_date?.startsWith(month))return false;if(typeF==="income"&&t.charged_amount<=0)return false;if(typeF==="expense"&&t.charged_amount>0)return false;return true;});
+  const totalIncome=filtered.filter(t=>t.charged_amount>0).reduce((s,t)=>s+t.charged_amount,0);
+  const totalExpense=filtered.filter(t=>t.charged_amount<0).reduce((s,t)=>s+Math.abs(t.charged_amount),0);
+  const balance=totalIncome-totalExpense;
+  if(loading)return <div style={S.empty}>טוען תנועות...</div>;
+  return(<div style={{padding:"8px 0 20px"}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:12}}>
+      <div style={S.statCard}><div style={{fontSize:24,fontWeight:800,color:"#10B981"}}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
+      <div style={S.statCard}><div style={{fontSize:24,fontWeight:800,color:"#EF4444"}}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
+      <div style={S.statCard}><div style={{fontSize:24,fontWeight:800,color:balance>=0?"#10B981":"#EF4444"}}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
+    </div>
+    <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+      <select style={{...S.inp,width:"auto",padding:"4px 10px",fontSize:12,borderRadius:14}} value={month} onChange={e=>setMonth(e.target.value)}><option value="">כל התקופה</option>{months.map(m=><option key={m} value={m}>{new Date(m+"-01").toLocaleDateString("he-IL",{month:"long",year:"numeric"})}</option>)}</select>
+      <button style={!typeF?S.filterOn:S.filterOff} onClick={()=>setTypeF("")}>הכל</button>
+      <button style={typeF==="income"?{...S.filterOn,background:"#10B981"}:S.filterOff} onClick={()=>setTypeF(typeF==="income"?"":"income")}>הכנסות</button>
+      <button style={typeF==="expense"?{...S.filterOn,background:"#EF4444"}:S.filterOff} onClick={()=>setTypeF(typeF==="expense"?"":"expense")}>הוצאות</button>
+      <span style={{fontSize:12,color:"#475569",marginRight:"auto"}}>{filtered.length} תנועות</span>
+    </div>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th style={S.th}>תאריך</th><th style={S.th}>תיאור</th><th style={S.th}>סכום</th><th style={S.th}>הערה</th></tr></thead><tbody>
+      {filtered.map((t,i)=><tr key={t.unique_id||i}><td style={S.td}>{t.activity_date?fmtDate(t.activity_date):""}</td><td style={S.td}>{t.description}</td><td style={{...S.td,fontWeight:600,color:t.charged_amount>0?"#10B981":"#EF4444",direction:"ltr",textAlign:"right"}}>₪{Math.abs(t.charged_amount).toLocaleString()}</td><td style={{...S.td,color:"#64748B",fontSize:12}}>{t.memo}</td></tr>)}
+    </tbody></table></div>
+    {filtered.length===0&&<p style={S.empty}>אין תנועות</p>}
+  </div>);
+}
+
 export default function App(){
   const [leads,setLeads]=useState([]);const [interactions,setInteractions]=useState([]);const [tasks,setTasks]=useState([]);const [sessions,setSessions]=useState([]);const [packages,setPackages]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState(null);const [view,setView]=useState("leads");const [leadsMode,setLeadsMode]=useState("board");const [showForm,setShowForm]=useState(false);const [showNotifs,setShowNotifs]=useState(false);const [selectedLead,setSelectedLead]=useState(null);const [search,setSearch]=useState("");const [serviceFilter,setServiceFilter]=useState("");const [statusFilter,setStatusFilter]=useState("");const [sourceFilter,setSourceFilter]=useState("");const [taskFilter,setTaskFilter]=useState(false);const [dragId,setDragId]=useState(null);const toast=useToast();const notifs=useNotifications(leads,tasks,interactions);
 
@@ -162,7 +192,7 @@ export default function App(){
 
   return(<div style={S.app}>
   <div style={S.header}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><h1 style={{fontSize:20,fontWeight:800,margin:0}}>🎤 אולפני הנסיכה <span style={{fontSize:12,fontWeight:500,color:"#8B5CF6"}}>CRM</span></h1><div style={{display:"flex",gap:6,alignItems:"center"}}><button style={{...S.iconBtn,position:"relative"}} onClick={()=>setShowNotifs(true)}>{I.bell}{notifs.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#EF4444",color:"#fff",fontSize:10,fontWeight:700,width:16,height:16,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{notifs.length}</span>}</button><button style={S.addBtn} onClick={()=>setShowForm(true)}>{I.plus} ליד חדש</button></div></div>
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={S.searchBox}>{I.search}<input style={S.searchInp} value={search} onChange={e=>setSearch(e.target.value)} placeholder="חיפוש..."/></div><div style={S.tabs}><button style={view==="leads"?S.tabOn:S.tabOff} onClick={()=>{if(view==="leads")setLeadsMode(leadsMode==="board"?"list":"board");else setView("leads");}}>לידים {view==="leads"&&<span style={{fontSize:10,opacity:0.7}}>({leadsMode==="board"?"לוח":"רשימה"})</span>}</button><button style={view==="clients"?S.tabOn:S.tabOff} onClick={()=>setView("clients")}>לקוחות</button><button style={view==="tasks"?S.tabOn:S.tabOff} onClick={()=>setView("tasks")}>משימות</button><button style={view==="stats"?S.tabOn:S.tabOff} onClick={()=>setView("stats")}>נתונים</button></div></div></div>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={S.searchBox}>{I.search}<input style={S.searchInp} value={search} onChange={e=>setSearch(e.target.value)} placeholder="חיפוש..."/></div><div style={S.tabs}><button style={view==="leads"?S.tabOn:S.tabOff} onClick={()=>{if(view==="leads")setLeadsMode(leadsMode==="board"?"list":"board");else setView("leads");}}>לידים {view==="leads"&&<span style={{fontSize:10,opacity:0.7}}>({leadsMode==="board"?"לוח":"רשימה"})</span>}</button><button style={view==="clients"?S.tabOn:S.tabOff} onClick={()=>setView("clients")}>לקוחות</button><button style={view==="tasks"?S.tabOn:S.tabOff} onClick={()=>setView("tasks")}>משימות</button><button style={view==="finances"?S.tabOn:S.tabOff} onClick={()=>setView("finances")}>כספים</button><button style={view==="stats"?S.tabOn:S.tabOff} onClick={()=>setView("stats")}>נתונים</button></div></div></div>
 
   {view==="leads"&&<div style={{display:"flex",gap:4,flexWrap:"wrap",padding:"6px 0",alignItems:"center"}}><button style={!serviceFilter&&!taskFilter&&!statusFilter&&!sourceFilter?S.filterOn:S.filterOff} onClick={()=>{setServiceFilter("");setTaskFilter(false);setStatusFilter("");setSourceFilter("");}}>הכל</button>{STATUSES.map(s=>{const c=leads.filter(l=>l.status===s.id).length;if(c===0)return null;return <button key={s.id} style={statusFilter===s.id?{...S.filterOn,background:s.color}:S.filterOff} onClick={()=>setStatusFilter(statusFilter===s.id?"":s.id)}>{s.label} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/>{SERVICES.map(svc=>{const c=leads.filter(l=>l.service===svc).length;if(c===0)return null;return <button key={svc} style={serviceFilter===svc?S.filterOn:S.filterOff} onClick={()=>setServiceFilter(serviceFilter===svc?"":svc)}>{svc} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><select style={{...S.inp,width:"auto",padding:"3px 8px",fontSize:12,borderRadius:14,background:sourceFilter?"#F59E0B":"#1E293B",color:sourceFilter?"#fff":"#64748B",border:"none",fontWeight:sourceFilter?600:400}} value={sourceFilter} onChange={e=>setSourceFilter(e.target.value)}><option value="">מקור</option>{SOURCES.map(src=>{const c=leads.filter(l=>l.source===src).length;if(c===0)return null;return <option key={src} value={src}>{src} ({c})</option>;})}</select><span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><button style={taskFilter?{...S.filterOn,background:"#3B82F6"}:S.filterOff} onClick={()=>setTaskFilter(!taskFilter)}>📋 משימות</button></div>}
 
@@ -172,6 +202,7 @@ export default function App(){
 
   {view==="clients"&&<ClientsView leads={leads} onSelect={setSelectedLead}/>}
   {view==="tasks"&&<TasksView tasks={tasks} leads={leads} onToggle={toggleTask} onDelete={deleteTask}/>}
+  {view==="finances"&&<FinancesView/>}
   {view==="stats"&&<Stats leads={leads}/>}
   {showForm&&<LeadForm onSave={addLead} onClose={()=>setShowForm(false)}/>}
   {showNotifs&&<NotifPanel notifs={notifs} onClose={()=>setShowNotifs(false)} onSelect={id=>{const l=leads.find(x=>x.id===id);if(l)setSelectedLead(l);}}/>}
