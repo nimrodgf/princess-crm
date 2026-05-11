@@ -132,30 +132,87 @@ function useNotifications(leads,tasks,interactions){return useMemo(()=>{const n=
 
 function NotifPanel({notifs,onClose,onSelect}){return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>🔔 התראות ({notifs.length})</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={{display:"flex",flexDirection:"column",gap:4}}>{notifs.map((n,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",background:"#0F172A",borderRadius:8,padding:"10px 12px",cursor:"pointer",borderRight:`3px solid ${n.type==="lead"?"#F59E0B":"#EF4444"}`}} onClick={()=>{onSelect(n.leadId);onClose();}}><span style={{fontSize:14}}>{n.type==="lead"?"⚠️":"⏰"}</span><span style={{fontSize:13,flex:1}}>{n.text}</span></div>)}{notifs.length===0&&<p style={S.empty}>אין התראות 🎉</p>}</div></Modal>);}
 
+const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר"];
+const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תחזוקת רכב","דלק","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
+const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית"];
+const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
+const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"utility",label:"utility"}];
+const INCOME_SOURCES=["אולפן","בית ריק","הפקה","פודקאסטים","בקליין","הופעות","שוכרי משנה","מיקסים"];
+const PAY_METHODS=["אשראי","העברה","מזומן","הוראת קבע","ביט","פייבוקס","אחר"];
+const TXN_STATUSES=["שולם/התקבל","בחוב","עתידי"];
+
 function FinancesView(){
-  const [txns,setTxns]=useState([]);const [loading,setLoading]=useState(true);const [month,setMonth]=useState(new Date().toISOString().slice(0,7));const [typeF,setTypeF]=useState("");
-  useEffect(()=>{setLoading(true);sbMoneyman(`?order=activity_date.desc&limit=500`).then(d=>{setTxns(d||[]);setLoading(false);}).catch(()=>setLoading(false));},[]);
+  const [txns,setTxns]=useState([]);const [meta,setMeta]=useState([]);const [loading,setLoading]=useState(true);
+  const [month,setMonth]=useState(new Date().toISOString().slice(0,7));const [typeF,setTypeF]=useState("");const [domainF,setDomainF]=useState("");const [catF,setCatF]=useState("");
+  const [editId,setEditId]=useState(null);const [ef,setEf]=useState({});
+
+  useEffect(()=>{Promise.all([
+    sbMoneyman("?order=activity_date.desc&limit=1000"),
+    sb("transaction_meta","GET",null,"?order=created_at.desc&limit=1000")
+  ]).then(([t,m])=>{setTxns(t||[]);setMeta(m||[]);setLoading(false);}).catch(()=>setLoading(false));},[]);
+
+  const getMeta=(uid)=>meta.find(m=>m.unique_id===uid)||{};
+  const saveMeta=async(uid,data)=>{
+    const existing=meta.find(m=>m.unique_id===uid);
+    if(existing){const [r]=await sb("transaction_meta","PATCH",data,`?id=eq.${existing.id}`);setMeta(p=>p.map(m=>m.id===existing.id?r:m));}
+    else{const [r]=await sb("transaction_meta","POST",{unique_id:uid,...data});setMeta(p=>[r,...p]);}
+    setEditId(null);
+  };
+
   const months=[...new Set(txns.map(t=>t.activity_date?.slice(0,7)).filter(Boolean))].sort().reverse();
-  const filtered=txns.filter(t=>{if(month&&!t.activity_date?.startsWith(month))return false;if(typeF==="income"&&t.charged_amount<=0)return false;if(typeF==="expense"&&t.charged_amount>0)return false;return true;});
+  const merged=txns.map(t=>{const m=getMeta(t.unique_id);return {...t,...m,_uid:t.unique_id};});
+  const filtered=merged.filter(t=>{
+    if(month&&!t.activity_date?.startsWith(month))return false;
+    if(typeF==="income"&&t.charged_amount<=0)return false;
+    if(typeF==="expense"&&t.charged_amount>0)return false;
+    if(domainF&&t.domain!==domainF)return false;
+    if(catF&&t.category!==catF)return false;
+    return true;
+  });
+
   const totalIncome=filtered.filter(t=>t.charged_amount>0).reduce((s,t)=>s+t.charged_amount,0);
   const totalExpense=filtered.filter(t=>t.charged_amount<0).reduce((s,t)=>s+Math.abs(t.charged_amount),0);
   const balance=totalIncome-totalExpense;
+
+  // Category breakdown
+  const byCat={};filtered.forEach(t=>{const c=t.category||"ללא קטגוריה";byCat[c]=(byCat[c]||0)+Math.abs(t.charged_amount);});
+  const topCats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxCat=topCats[0]?.[1]||1;
+
   if(loading)return <div style={S.empty}>טוען תנועות...</div>;
   return(<div style={{padding:"8px 0 20px"}}>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:12}}>
-      <div style={S.statCard}><div style={{fontSize:24,fontWeight:800,color:"#10B981"}}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
-      <div style={S.statCard}><div style={{fontSize:24,fontWeight:800,color:"#EF4444"}}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
-      <div style={S.statCard}><div style={{fontSize:24,fontWeight:800,color:balance>=0?"#10B981":"#EF4444"}}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginBottom:12}}>
+      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800,color:"#10B981"}}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
+      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800,color:"#EF4444"}}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
+      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800,color:balance>=0?"#10B981":"#EF4444"}}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
+      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800}}>{filtered.length}</div><div style={S.statLbl}>תנועות</div></div>
     </div>
+    {topCats.length>0&&<div style={{...S.statCard,marginBottom:12}}><div style={S.statLbl}>פילוח לפי קטגוריה</div>{topCats.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}><span style={{minWidth:80}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/maxCat)*100}%`,background:"#8B5CF6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:50,textAlign:"left",direction:"ltr"}}>₪{c.toLocaleString()}</span></div>)}</div>}
     <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
-      <select style={{...S.inp,width:"auto",padding:"4px 10px",fontSize:12,borderRadius:14}} value={month} onChange={e=>setMonth(e.target.value)}><option value="">כל התקופה</option>{months.map(m=><option key={m} value={m}>{new Date(m+"-01").toLocaleDateString("he-IL",{month:"long",year:"numeric"})}</option>)}</select>
+      <select style={{...S.inp,width:"auto",padding:"4px 8px",fontSize:12,borderRadius:14}} value={month} onChange={e=>setMonth(e.target.value)}><option value="">כל התקופה</option>{months.map(m=><option key={m} value={m}>{new Date(m+"-01").toLocaleDateString("he-IL",{month:"long",year:"numeric"})}</option>)}</select>
       <button style={!typeF?S.filterOn:S.filterOff} onClick={()=>setTypeF("")}>הכל</button>
       <button style={typeF==="income"?{...S.filterOn,background:"#10B981"}:S.filterOff} onClick={()=>setTypeF(typeF==="income"?"":"income")}>הכנסות</button>
       <button style={typeF==="expense"?{...S.filterOn,background:"#EF4444"}:S.filterOff} onClick={()=>setTypeF(typeF==="expense"?"":"expense")}>הוצאות</button>
-      <span style={{fontSize:12,color:"#475569",marginRight:"auto"}}>{filtered.length} תנועות</span>
+      <select style={{...S.inp,width:"auto",padding:"4px 8px",fontSize:12,borderRadius:14,background:domainF?"#F59E0B":"#1E293B",color:domainF?"#fff":"#64748B",border:"none"}} value={domainF} onChange={e=>setDomainF(e.target.value)}><option value="">תחום</option>{DOMAINS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select>
+      <select style={{...S.inp,width:"auto",padding:"4px 8px",fontSize:12,borderRadius:14,background:catF?"#8B5CF6":"#1E293B",color:catF?"#fff":"#64748B",border:"none"}} value={catF} onChange={e=>setCatF(e.target.value)}><option value="">קטגוריה</option>{ALL_CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
     </div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th style={S.th}>תאריך</th><th style={S.th}>תיאור</th><th style={S.th}>סכום</th><th style={S.th}>הערה</th></tr></thead><tbody>
-      {filtered.map((t,i)=><tr key={t.unique_id||i}><td style={S.td}>{t.activity_date?fmtDate(t.activity_date):""}</td><td style={S.td}>{t.description}</td><td style={{...S.td,fontWeight:600,color:t.charged_amount>0?"#10B981":"#EF4444",direction:"ltr",textAlign:"right"}}>₪{Math.abs(t.charged_amount).toLocaleString()}</td><td style={{...S.td,color:"#64748B",fontSize:12}}>{t.memo}</td></tr>)}
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th style={S.th}>תאריך</th><th style={S.th}>תיאור</th><th style={S.th}>סכום</th><th style={S.th}>תחום</th><th style={S.th}>קטגוריה</th><th style={S.th}>תשלום</th><th style={S.th}>סטטוס</th><th style={S.th}></th></tr></thead><tbody>
+      {filtered.map((t,i)=>{const isEd=editId===t._uid;const m=getMeta(t._uid);return isEd?(<tr key={t._uid||i}><td style={S.td}>{t.activity_date?fmtDate(t.activity_date):""}</td><td style={S.td}>{t.description}</td><td style={{...S.td,fontWeight:600,color:t.charged_amount>0?"#10B981":"#EF4444",direction:"ltr",textAlign:"right"}}>₪{Math.abs(t.charged_amount).toLocaleString()}</td>
+        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.domain||""} onChange={e=>setEf(p=>({...p,domain:e.target.value}))}><option value="">—</option>{DOMAINS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
+        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.category||""} onChange={e=>setEf(p=>({...p,category:e.target.value}))}><option value="">—</option>{(t.charged_amount>0?INCOME_CATS:ef.domain==="home"?EXPENSE_CATS_HOME:ef.domain==="biz"?EXPENSE_CATS_BIZ:[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ]).map(c=><option key={c} value={c}>{c}</option>)}</select></td>
+        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.payment_method||""} onChange={e=>setEf(p=>({...p,payment_method:e.target.value}))}><option value="">—</option>{PAY_METHODS.map(p=><option key={p} value={p}>{p}</option>)}</select></td>
+        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.status||"paid"} onChange={e=>setEf(p=>({...p,status:e.target.value}))}>{TXN_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></td>
+        <td style={S.td}><button onClick={()=>saveMeta(t._uid,ef)} style={{...S.iconBtn,color:"#10B981"}}>{I.check}</button><button onClick={()=>setEditId(null)} style={{...S.iconBtn,color:"#64748B"}}>{I.x}</button></td>
+      </tr>):(<tr key={t._uid||i} style={{cursor:"pointer"}} onClick={()=>{setEditId(t._uid);setEf({domain:m.domain||"",category:m.category||"",payment_method:m.payment_method||"",status:m.status||"paid",income_source:m.income_source||""});}}>
+        <td style={S.td}>{t.activity_date?fmtDate(t.activity_date):""}</td>
+        <td style={S.td}>{t.description}{t.memo?<span style={{color:"#475569",fontSize:11,marginRight:6}}> ({t.memo})</span>:""}</td>
+        <td style={{...S.td,fontWeight:600,color:t.charged_amount>0?"#10B981":"#EF4444",direction:"ltr",textAlign:"right"}}>₪{Math.abs(t.charged_amount).toLocaleString()}</td>
+        <td style={S.td}>{m.domain?DOMAINS.find(d=>d.id===m.domain)?.label:""}</td>
+        <td style={S.td}><span style={{fontSize:12}}>{m.category||""}</span></td>
+        <td style={S.td}><span style={{fontSize:12}}>{m.payment_method||""}</span></td>
+        <td style={S.td}><span style={{fontSize:12,color:m.status==="בחוב"?"#F59E0B":m.status==="עתידי"?"#3B82F6":"#475569"}}>{m.status||""}</span></td>
+        <td style={S.td}>{m.category?<span style={{color:"#10B981",fontSize:10}}>✓</span>:<span style={{color:"#64748B",fontSize:10}}>✎</span>}</td>
+      </tr>);})}
     </tbody></table></div>
     {filtered.length===0&&<p style={S.empty}>אין תנועות</p>}
   </div>);
