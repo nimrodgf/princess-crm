@@ -10,7 +10,7 @@ async function addToCalendar(title, start, desc = "") { try { const r = await fe
 const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
 const BOARD_STATUSES = STATUSES.filter(s => s.id !== "new");
 const SERVICES = ["הקלטה", "מיקס", "הפקה", "הפקה - אפיק", "לייב סשן", "פודקאסט", "צילום קורס", "השכרת חלל", "בית ריק", "ייעוץ אומנותי - נימשי", "ייעוץ אומנותי - אפיק", "אחר"];
-const SOURCES = ["אינסטגרם", "המלצה", "גוגל", "פייסבוק", "אתר", "שיווק אקטיבי", "חוזר/ת", "אחר"];
+const SOURCES = ["אינסטגרם", "המלצה", "גוגל", "פייסבוק", "אתר", "שיווק אקטיבי", "ממומן - מטא", "חוזר/ת", "אחר"];
 const TASK_TYPES = [{ id: "followup", label: "פולואפ", icon: "📞" }, { id: "call", label: "שיחה", icon: "☎️" }, { id: "prep", label: "הכנת חומרים", icon: "📦" }, { id: "export", label: "ייצוא", icon: "📤" }, { id: "other", label: "אחר", icon: "📌" }];
 const INTERACTION_TYPES = [{ id: "call", label: "שיחה" }, { id: "followup", label: "פולואפ" }, { id: "meeting", label: "פגישה" }, { id: "quote", label: "הצעת מחיר" }, { id: "note", label: "הערה" }];
 const TEMPS = [{ id: "hot", label: "חם", color: "#EF4444", emoji: "🔥" }, { id: "warm", label: "פושר", color: "#F59E0B", emoji: "🌤" }, { id: "cold", label: "קר", color: "#06B6D4", emoji: "❄️" }];
