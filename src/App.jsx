@@ -303,6 +303,12 @@ function CashflowView({ leads }) {
   const [showManualForm, setShowManualForm] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(null);
   const [matchConfirm, setMatchConfirm] = useState(null);
+  const [currentBalance, setCurrentBalance] = useState(() => {
+    const saved = localStorage.getItem("princess_current_balance");
+    return saved ? Number(saved) : null;
+  });
+  const [balanceInput, setBalanceInput] = useState("");
+  const [showBalanceEdit, setShowBalanceEdit] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -372,11 +378,14 @@ function CashflowView({ leads }) {
       }
     });
     rows.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-    // Calc running total
-    let running = 0;
+    // Calc running total with opening balance
+    // openingBalance = currentBalance - sum of all bank transactions
+    const bankSum = rows.filter(r => r._type === "bank").reduce((s, r) => s + r.amount, 0);
+    const openingBalance = currentBalance !== null ? currentBalance - bankSum : 0;
+    let running = openingBalance;
     rows.forEach(r => { running += r.amount; r._running = running; });
     return rows;
-  }, [txns, meta, manualTxns, projections]);
+  }, [txns, meta, manualTxns, projections, currentBalance]);
 
   const months = [...new Set(unified.map(t => t.date?.slice(0, 7)).filter(Boolean))].sort().reverse();
 
@@ -404,8 +413,27 @@ function CashflowView({ leads }) {
         <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
         <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
         <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: balance >= 0 ? "#10B981" : "#EF4444" }}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800 }}>{filtered.length}</div><div style={S.statLbl}>תנועות</div></div>
+        <div style={S.statCard} onClick={() => setShowBalanceEdit(true)} title="לחץ לעדכן">
+          {currentBalance !== null ? (
+            <><div style={{ fontSize: 22, fontWeight: 800, color: "#3B82F6" }}>₪{currentBalance.toLocaleString()}</div><div style={S.statLbl}>יתרה בבנק ✎</div></>
+          ) : (
+            <><div style={{ fontSize: 16, fontWeight: 600, color: "#F59E0B" }}>הגדר יתרה</div><div style={S.statLbl}>לחץ להזין יתרת בנק</div></>
+          )}
+        </div>
       </div>
+
+      {/* Balance editor */}
+      {showBalanceEdit && (
+        <div style={{ ...S.statCard, marginBottom: 12, borderRight: "3px solid #3B82F6" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>יתרה נוכחית בבנק:</span>
+            <input style={{ ...S.inp, width: 120, padding: "4px 8px", fontSize: 13 }} type="number" value={balanceInput} onChange={e => setBalanceInput(e.target.value)} placeholder="למשל: 18916" dir="ltr" autoFocus onKeyDown={e => { if (e.key === "Enter" && balanceInput) { const val = Number(balanceInput); setCurrentBalance(val); localStorage.setItem("princess_current_balance", String(val)); setShowBalanceEdit(false); setBalanceInput(""); _showToast("✓ יתרה עודכנה"); }}} />
+            <button style={{ ...S.btn1, padding: "4px 12px", fontSize: 12 }} onClick={() => { if (!balanceInput) return; const val = Number(balanceInput); setCurrentBalance(val); localStorage.setItem("princess_current_balance", String(val)); setShowBalanceEdit(false); setBalanceInput(""); _showToast("✓ יתרה עודכנה"); }}>שמור</button>
+            <button style={{ ...S.btn2, padding: "4px 12px", fontSize: 12 }} onClick={() => setShowBalanceEdit(false)}>ביטול</button>
+          </div>
+          <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>הזן את היתרה הנוכחית בחשבון הבנק. המערכת תחשב יתרת פתיחה ותזרים מצטבר בהתאם.</div>
+        </div>
+      )}
 
       {/* Match alerts */}
       {potentialMatches.length > 0 && !month && (
