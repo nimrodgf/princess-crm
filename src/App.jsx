@@ -39,6 +39,7 @@ const I = {
   bell: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
   wa: <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
   ig: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>,
+  link: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>,
 };
 
 function Modal({ children, onClose }) { return <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e => e.stopPropagation()}>{children}</div></div>; }
@@ -122,8 +123,6 @@ function LeadDetail({lead,interactions,tasks,sessions,packages,onBack,onUpdate,o
   {showTaskForm&&<TaskForm leadId={lead.id} leadName={lead.name} onSave={async(t,cal)=>{await onAddTask(t);if(cal)sendToCal(`${lead.name} — ${t.title}`,t.due_date,`טלפון: ${lead.phone||""}`);setShowTaskForm(false);}} onClose={()=>setShowTaskForm(false)}/>}</div>);
 }
 
-function Stats({leads}){const total=leads.length;const byStatus=STATUSES.map(s=>({...s,count:leads.filter(l=>l.status===s.id).length}));const closed=byStatus.find(s=>s.id==="closed")?.count||0;const lost=byStatus.find(s=>s.id==="lost")?.count||0;const decided=closed+lost;const rate=decided>0?Math.round((closed/decided)*100):0;const revenue=leads.filter(l=>l.status==="closed").reduce((s,l)=>s+(l.amount||0),0);const byService={};leads.forEach(l=>{if(l.service)byService[l.service]=(byService[l.service]||0)+1;});const topSvc=Object.entries(byService).sort((a,b)=>b[1]-a[1]).slice(0,6);const bySource={};leads.forEach(l=>{if(l.source)bySource[l.source]=(bySource[l.source]||0)+1;});const topSrc=Object.entries(bySource).sort((a,b)=>b[1]-a[1]).slice(0,6);const mx=a=>a[0]?.[1]||1;return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,padding:"8px 0 20px"}}><div style={S.statCard}><div style={{fontSize:36,fontWeight:800}}>{total}</div><div style={S.statLbl}>סה״כ</div></div><div style={S.statCard}><div style={{fontSize:36,fontWeight:800,color:"#10B981"}}>{rate}%</div><div style={S.statLbl}>המרה</div></div><div style={S.statCard}><div style={{fontSize:28,fontWeight:800,color:"#3B82F6"}}>₪{revenue.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div><div style={S.statCard}>{byStatus.map(s=><div key={s.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}><span style={{width:8,height:8,borderRadius:"50%",background:s.color}}/><span style={{flex:1}}>{s.label}</span><span style={{fontWeight:700}}>{s.count}</span></div>)}</div>{topSvc.length>0&&<div style={S.statCard}><div style={S.statLbl}>שירותים</div>{topSvc.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}><span style={{minWidth:70}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/mx(topSvc))*100}%`,background:"#3B82F6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:16,textAlign:"center"}}>{c}</span></div>)}</div>}{topSrc.length>0&&<div style={S.statCard}><div style={S.statLbl}>מקורות</div>{topSrc.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}><span style={{minWidth:70}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/mx(topSrc))*100}%`,background:"#8B5CF6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:16,textAlign:"center"}}>{c}</span></div>)}</div>}</div>);}
-
 function TasksView({tasks,leads,onToggle,onDelete}){const pending=tasks.filter(t=>!t.completed).sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));const done=tasks.filter(t=>t.completed).sort((a,b)=>new Date(b.due_date)-new Date(a.due_date)).slice(0,10);const renderTask=t=>{const lead=leads.find(l=>l.id===t.lead_id);const tt=TASK_TYPES.find(x=>x.id===t.type);const overdue=!t.completed&&new Date(t.due_date)<new Date();return(<div key={t.id} style={{display:"flex",alignItems:"center",gap:8,background:"#0F172A",borderRadius:8,padding:"8px 12px",opacity:t.completed?0.5:1,borderRight:`3px solid ${overdue?"#EF4444":t.completed?"#10B981":"#3B82F6"}`}}><button onClick={()=>onToggle(t.id,!t.completed)} style={{...S.iconBtn,color:t.completed?"#10B981":"#475569",flexShrink:0}}>{t.completed?I.check:<div style={{width:14,height:14,border:"2px solid #475569",borderRadius:3}}/>}</button><div style={{flex:1,minWidth:0}}><div style={{fontSize:13,textDecoration:t.completed?"line-through":"none"}}>{tt?.icon} {t.title}</div>{lead&&<div style={{fontSize:11,color:"#475569"}}>{lead.name}</div>}</div><span style={{fontSize:11,color:overdue?"#EF4444":"#475569",whiteSpace:"nowrap"}}>{daysAgo(t.due_date)}</span><button onClick={()=>sendToCal(lead?`${lead.name} — ${t.title}`:t.title,t.due_date,lead?`טלפון: ${lead.phone||""}`:"")} style={{...S.iconBtn,color:"#3B82F6"}}>{I.cal}</button><button onClick={()=>onDelete(t.id)} style={{...S.iconBtn,color:"#64748B"}}>{I.trash}</button></div>);};return(<div style={{padding:"8px 0 20px"}}><h3 style={{...S.secTitle,marginBottom:8}}>פתוחות ({pending.length})</h3><div style={{display:"flex",flexDirection:"column",gap:4}}>{pending.map(renderTask)}{pending.length===0&&<p style={S.empty}>אין משימות 🎉</p>}</div>{done.length>0&&<><h3 style={{...S.secTitle,marginTop:16,marginBottom:8,color:"#475569"}}>הושלמו</h3><div style={{display:"flex",flexDirection:"column",gap:4}}>{done.map(renderTask)}</div></>}</div>);}
 
 function ClientsView({leads,onSelect}){const clients=leads.filter(l=>l.status==="closed");const [svcFilter,setSvcFilter]=useState("");const [csFilter,setCsFilter]=useState("");const [search,setSearch]=useState("");const filtered=clients.filter(c=>{if(svcFilter&&c.service!==svcFilter)return false;if(csFilter&&c.client_status!==csFilter)return false;if(search&&!c.name.includes(search)&&!c.phone?.includes(search))return false;return true;});return(<div style={{padding:"8px 0 20px"}}><div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}><div style={S.searchBox}>{I.search}<input style={S.searchInp} value={search} onChange={e=>setSearch(e.target.value)} placeholder="חיפוש לקוח..."/></div></div><div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}><button style={!csFilter?S.filterOn:S.filterOff} onClick={()=>setCsFilter("")}>הכל ({clients.length})</button>{CLIENT_STATUSES.map(cs=>{const c=clients.filter(l=>l.client_status===cs.id).length;return <button key={cs.id} style={csFilter===cs.id?{...S.filterOn,background:cs.color}:S.filterOff} onClick={()=>setCsFilter(csFilter===cs.id?"":cs.id)}>{cs.label} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/>{SERVICES.map(svc=>{const c=clients.filter(l=>l.service===svc).length;if(c===0)return null;return <button key={svc} style={svcFilter===svc?S.filterOn:S.filterOff} onClick={()=>setSvcFilter(svcFilter===svc?"":svc)}>{svc} ({c})</button>;})}</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>{filtered.map(c=>{const cs=CLIENT_STATUSES.find(x=>x.id===c.client_status);return(<div key={c.id} style={{...S.card,cursor:"pointer"}} onClick={()=>onSelect(c)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:14,fontWeight:600}}>{c.name}</span>{cs&&<span style={{fontSize:10,background:cs.color+"20",color:cs.color,padding:"1px 8px",borderRadius:10,fontWeight:600}}>{cs.label}</span>}</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{c.service&&<span style={{fontSize:11,background:"#1E293B",color:"#94A3B8",padding:"1px 7px",borderRadius:4}}>{c.service}</span>}{c.amount>0&&<span style={{fontSize:11,color:"#10B981",fontWeight:600}}>₪{c.amount.toLocaleString()}</span>}</div>{c.phone&&<div style={{fontSize:11,color:"#475569",marginTop:4}}>{c.phone}</div>}</div>);})}</div>{filtered.length===0&&<p style={S.empty}>אין לקוחות</p>}</div>);}
@@ -141,85 +140,583 @@ const INCOME_SOURCES=["אולפן","בית ריק","הפקה","פודקאסטי�
 const PAY_METHODS=["אשראי","העברה","מזומן","הוראת קבע","ביט","פייבוקס","אחר"];
 const TXN_STATUSES=["שולם/התקבל","בחוב","עתידי"];
 
-function FinancesView(){
-  const [txns,setTxns]=useState([]);const [meta,setMeta]=useState([]);const [loading,setLoading]=useState(true);
-  const [month,setMonth]=useState(new Date().toISOString().slice(0,7));const [typeF,setTypeF]=useState("");const [domainF,setDomainF]=useState("");const [catF,setCatF]=useState("");
-  const [editId,setEditId]=useState(null);const [ef,setEf]=useState({});
+/* ═══════════════════════════════════════════
+   CASHFLOW VIEW — replaces old FinancesView
+   ═══════════════════════════════════════════ */
 
-  useEffect(()=>{Promise.all([
-    sbMoneyman("?order=activity_date.desc&limit=1000"),
-    sb("transaction_meta","GET",null,"?order=created_at.desc&limit=1000")
-  ]).then(([t,m])=>{setTxns(t||[]);setMeta(m||[]);setLoading(false);}).catch(()=>setLoading(false));},[]);
+function generateRecurringProjections(recurring) {
+  const projections = [];
+  const now = new Date();
+  const endDate = new Date("2026-12-31");
+  for (const r of recurring) {
+    if (!r.is_active) continue;
+    let d = new Date(now.getFullYear(), now.getMonth(), r.day_of_month || 1);
+    if (d < now) d.setMonth(d.getMonth() + 1);
+    while (d <= endDate) {
+      projections.push({
+        _type: "recurring",
+        _recurringId: r.id,
+        date: d.toISOString().slice(0, 10),
+        description: r.description,
+        amount: r.type === "expense" ? -Math.abs(r.amount) : Math.abs(r.amount),
+        domain: r.domain || "",
+        category: r.category || "",
+        status: "עתידי",
+      });
+      d = new Date(d);
+      d.setMonth(d.getMonth() + 1);
+    }
+  }
+  return projections;
+}
 
-  const getMeta=(uid)=>meta.find(m=>m.unique_id===uid)||{};
-  const saveMeta=async(uid,data)=>{
-    const existing=meta.find(m=>m.unique_id===uid);
-    if(existing){const [r]=await sb("transaction_meta","PATCH",data,`?id=eq.${existing.id}`);setMeta(p=>p.map(m=>m.id===existing.id?r:m));}
-    else{const [r]=await sb("transaction_meta","POST",{unique_id:uid,...data});setMeta(p=>[r,...p]);}
+function findPotentialMatches(bankTxns, projections) {
+  const matches = [];
+  for (const proj of projections) {
+    const projMonth = proj.date.slice(0, 7);
+    const projAmt = Math.abs(proj.amount);
+    for (const bank of bankTxns) {
+      const bankMonth = bank.activity_date?.slice(0, 7);
+      if (bankMonth !== projMonth) continue;
+      const bankAmt = Math.abs(bank.charged_amount);
+      const diff = Math.abs(bankAmt - projAmt);
+      if (diff / projAmt < 0.05 || diff < 5) {
+        matches.push({ bank, proj });
+        break;
+      }
+    }
+  }
+  return matches;
+}
+
+function LinkLeadModal({ leads, onSelect, onClose }) {
+  const [search, setSearch] = useState("");
+  const clients = leads.filter(l => l.status === "closed");
+  const filtered = clients.filter(c => !search || c.name.includes(search));
+  return (
+    <Modal onClose={onClose}>
+      <div style={S.mHead}><h2 style={S.mTitle}>קישור ללקוח</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div>
+      <input style={{ ...S.inp, marginBottom: 8 }} value={search} onChange={e => setSearch(e.target.value)} placeholder="חיפוש לקוח..." />
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 300, overflowY: "auto" }}>
+        {filtered.map(c => (
+          <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0F172A", borderRadius: 8, padding: "8px 12px", cursor: "pointer" }} onClick={() => { onSelect(c.id); onClose(); }}>
+            <span style={{ fontSize: 13 }}>{c.name}</span>
+            {c.amount > 0 && <span style={{ fontSize: 11, color: "#10B981" }}>₪{c.amount.toLocaleString()}</span>}
+          </div>
+        ))}
+        {filtered.length === 0 && <p style={S.empty}>אין לקוחות</p>}
+      </div>
+      <div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button></div>
+    </Modal>
+  );
+}
+
+function ManualTxnForm({ onSave, onClose }) {
+  const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "" });
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+  const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), status: "planned" }); onClose(); };
+  return (
+    <Modal onClose={onClose}>
+      <div style={S.mHead}><h2 style={S.mTitle}>תנועה ידנית</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div>
+      <div style={S.grid2}>
+        <div><label style={S.lbl}>תאריך</label><input style={S.inp} type="date" value={f.date} onChange={e => set("date", e.target.value)} dir="ltr" /></div>
+        <div><label style={S.lbl}>סוג</label><select style={S.inp} value={f.type} onChange={e => set("type", e.target.value)}><option value="expense">הוצאה</option><option value="income">הכנסה</option></select></div>
+        <div style={S.full}><label style={S.lbl}>תיאור *</label><input style={S.inp} value={f.description} onChange={e => set("description", e.target.value)} placeholder="תיאור התנועה" /></div>
+        <div><label style={S.lbl}>סכום *</label><input style={S.inp} type="number" value={f.amount} onChange={e => set("amount", e.target.value)} dir="ltr" /></div>
+        <div><label style={S.lbl}>תחום</label><select style={S.inp} value={f.domain} onChange={e => set("domain", e.target.value)}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
+        <div style={S.full}><label style={S.lbl}>קטגוריה</label><select style={S.inp} value={f.category} onChange={e => set("category", e.target.value)}><option value="">—</option>{(f.type === "income" ? INCOME_CATS : f.domain === "home" ? EXPENSE_CATS_HOME : f.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+        <div style={S.full}><label style={S.lbl}>הערות</label><input style={S.inp} value={f.notes} onChange={e => set("notes", e.target.value)} placeholder="הערות" /></div>
+      </div>
+      <div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.description.trim() || !f.amount}>שמור</button></div>
+    </Modal>
+  );
+}
+
+function RecurringForm({ onSave, onClose }) {
+  const [f, setF] = useState({ description: "", amount: "", type: "expense", domain: "", category: "", day_of_month: 1 });
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+  const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), is_active: true }); onClose(); };
+  return (
+    <Modal onClose={onClose}>
+      <div style={S.mHead}><h2 style={S.mTitle}>תנועה קבועה חדשה</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div>
+      <div style={S.grid2}>
+        <div style={S.full}><label style={S.lbl}>תיאור *</label><input style={S.inp} value={f.description} onChange={e => set("description", e.target.value)} placeholder="למשל: שכ״ד, ביטוח, הלוואה" /></div>
+        <div><label style={S.lbl}>סוג</label><select style={S.inp} value={f.type} onChange={e => set("type", e.target.value)}><option value="expense">הוצאה</option><option value="income">הכנסה</option></select></div>
+        <div><label style={S.lbl}>סכום *</label><input style={S.inp} type="number" value={f.amount} onChange={e => set("amount", e.target.value)} dir="ltr" /></div>
+        <div><label style={S.lbl}>יום בחודש</label><input style={S.inp} type="number" value={f.day_of_month} onChange={e => set("day_of_month", Number(e.target.value))} min={1} max={28} dir="ltr" /></div>
+        <div><label style={S.lbl}>תחום</label><select style={S.inp} value={f.domain} onChange={e => set("domain", e.target.value)}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
+        <div style={S.full}><label style={S.lbl}>קטגוריה</label><select style={S.inp} value={f.category} onChange={e => set("category", e.target.value)}><option value="">—</option>{(f.type === "income" ? INCOME_CATS : f.domain === "home" ? EXPENSE_CATS_HOME : f.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+      </div>
+      <div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.description.trim() || !f.amount}>שמור</button></div>
+    </Modal>
+  );
+}
+
+function RecurringManager({ recurring, onAdd, onUpdate, onDelete }) {
+  const [showForm, setShowForm] = useState(false);
+  const active = recurring.filter(r => r.is_active);
+  const inactive = recurring.filter(r => !r.is_active);
+  return (
+    <div style={{ ...S.statCard, marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>🔄 תנועות קבועות ({active.length})</span>
+        <button style={{ ...S.btn1, padding: "4px 10px", fontSize: 11 }} onClick={() => setShowForm(true)}>{I.plus} חדשה</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
+        {active.map(r => (
+          <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "6px 10px", fontSize: 12 }}>
+            <span style={{ flex: 1 }}>{r.description}</span>
+            <span style={{ color: r.type === "income" ? "#10B981" : "#EF4444", fontWeight: 600, direction: "ltr" }}>₪{Math.abs(r.amount).toLocaleString()}</span>
+            <span style={{ color: "#475569", fontSize: 11 }}>יום {r.day_of_month}</span>
+            {r.domain && <span style={{ fontSize: 10, color: "#64748B" }}>{DOMAINS.find(d => d.id === r.domain)?.label}</span>}
+            <button onClick={() => onUpdate(r.id, { is_active: false })} style={{ ...S.iconBtn, color: "#F59E0B", fontSize: 11 }}>⏸</button>
+            <button onClick={() => { if (confirm("למחוק?")) onDelete(r.id); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
+          </div>
+        ))}
+        {active.length === 0 && <div style={{ fontSize: 12, color: "#334155", textAlign: "center", padding: 8 }}>אין תנועות קבועות</div>}
+      </div>
+      {inactive.length > 0 && <details style={{ marginTop: 6 }}><summary style={{ fontSize: 11, color: "#475569", cursor: "pointer" }}>מושהות ({inactive.length})</summary><div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>{inactive.map(r => (
+        <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "4px 10px", fontSize: 11, opacity: 0.6 }}>
+          <span style={{ flex: 1 }}>{r.description}</span>
+          <span style={{ direction: "ltr" }}>₪{Math.abs(r.amount).toLocaleString()}</span>
+          <button onClick={() => onUpdate(r.id, { is_active: true })} style={{ ...S.iconBtn, color: "#10B981", fontSize: 11 }}>▶</button>
+          <button onClick={() => { if (confirm("למחוק?")) onDelete(r.id); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
+        </div>
+      ))}</div></details>}
+      {showForm && <RecurringForm onSave={onAdd} onClose={() => setShowForm(false)} />}
+    </div>
+  );
+}
+
+function CashflowView({ leads }) {
+  const [txns, setTxns] = useState([]);
+  const [meta, setMeta] = useState([]);
+  const [manualTxns, setManualTxns] = useState([]);
+  const [recurring, setRecurring] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState("");
+  const [typeF, setTypeF] = useState("");
+  const [domainF, setDomainF] = useState("");
+  const [catF, setCatF] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [ef, setEf] = useState({});
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(null);
+  const [matchConfirm, setMatchConfirm] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      sbMoneyman("?order=activity_date.desc&limit=2000"),
+      sb("transaction_meta", "GET", null, "?order=created_at.desc&limit=2000"),
+      sb("manual_transactions", "GET", null, "?order=date.desc&limit=1000").catch(() => []),
+      sb("recurring_transactions", "GET", null, "?order=created_at.desc&limit=200").catch(() => []),
+    ]).then(([t, m, mt, rec]) => {
+      setTxns(t || []);
+      setMeta(m || []);
+      setManualTxns(mt || []);
+      setRecurring(rec || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const getMeta = (uid) => meta.find(m => m.unique_id === uid) || {};
+  const saveMeta = async (uid, data) => {
+    const existing = meta.find(m => m.unique_id === uid);
+    if (existing) { const [r] = await sb("transaction_meta", "PATCH", data, `?id=eq.${existing.id}`); setMeta(p => p.map(m => m.id === existing.id ? r : m)); }
+    else { const [r] = await sb("transaction_meta", "POST", { unique_id: uid, ...data }); setMeta(p => [r, ...p]); }
     setEditId(null);
   };
 
-  const months=[...new Set(txns.map(t=>t.activity_date?.slice(0,7)).filter(Boolean))].sort().reverse();
-  const merged=txns.map(t=>{const m=getMeta(t.unique_id);return {...t,...m,_uid:t.unique_id};});
-  const filtered=merged.filter(t=>{
-    if(month&&!t.activity_date?.startsWith(month))return false;
-    if(typeF==="income"&&t.charged_amount<=0)return false;
-    if(typeF==="expense"&&t.charged_amount>0)return false;
-    if(domainF&&t.domain!==domainF)return false;
-    if(catF&&t.category!==catF)return false;
+  const addManual = async (data) => {
+    try { const [r] = await sb("manual_transactions", "POST", data); setManualTxns(p => [r, ...p]); _showToast("✓ תנועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
+  };
+  const deleteManual = async (id) => {
+    try { await sb("manual_transactions", "DELETE", null, `?id=eq.${id}`); setManualTxns(p => p.filter(m => m.id !== id)); _showToast("✓ נמחק"); } catch (e) { _showToast("שגיאה", "error"); }
+  };
+  const addRecurring = async (data) => {
+    try { const [r] = await sb("recurring_transactions", "POST", data); setRecurring(p => [r, ...p]); _showToast("✓ תנועה קבועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
+  };
+  const updateRecurring = async (id, data) => {
+    try { const [r] = await sb("recurring_transactions", "PATCH", data, `?id=eq.${id}`); setRecurring(p => p.map(x => x.id === id ? r : x)); } catch (e) { _showToast("שגיאה", "error"); }
+  };
+  const deleteRecurring = async (id) => {
+    try { await sb("recurring_transactions", "DELETE", null, `?id=eq.${id}`); setRecurring(p => p.filter(x => x.id !== id)); _showToast("✓ נמחק"); } catch (e) { _showToast("שגיאה", "error"); }
+  };
+
+  const linkToLead = async (uid, leadId) => {
+    await saveMeta(uid, { ...ef, linked_lead_id: leadId });
+    _showToast("✓ קושר ללקוח");
+  };
+
+  // Build unified timeline
+  const projections = useMemo(() => generateRecurringProjections(recurring), [recurring]);
+  const matchedManualIds = new Set(manualTxns.filter(m => m.status === "matched").map(m => m.id));
+
+  const unified = useMemo(() => {
+    const rows = [];
+    // Bank transactions
+    txns.forEach(t => {
+      const m = getMeta(t.unique_id);
+      rows.push({ _key: "bank_" + t.unique_id, _type: "bank", _uid: t.unique_id, date: t.activity_date, description: t.description, memo: t.memo, amount: t.charged_amount, domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", linked_lead_id: m.linked_lead_id || null, income_source: m.income_source || "" });
+    });
+    // Manual transactions (not matched)
+    manualTxns.filter(m => m.status !== "matched").forEach(m => {
+      rows.push({ _key: "manual_" + m.id, _type: "manual", _manualId: m.id, date: m.date, description: m.description, amount: m.type === "expense" ? -Math.abs(m.amount) : Math.abs(m.amount), domain: m.domain || "", category: m.category || "", status: m.status === "planned" ? "עתידי" : m.status === "confirmed" ? "שולם/התקבל" : m.status, linked_lead_id: m.linked_lead_id || null, notes: m.notes });
+    });
+    // Recurring projections (only future months not covered by bank)
+    const bankMonthDescs = new Set(txns.map(t => t.activity_date?.slice(0, 7) + "|" + t.description));
+    projections.forEach(p => {
+      const key = p.date.slice(0, 7) + "|" + p.description;
+      if (!bankMonthDescs.has(key)) {
+        rows.push({ _key: "rec_" + p._recurringId + "_" + p.date, _type: "recurring", _recurringId: p._recurringId, date: p.date, description: p.description, amount: p.amount, domain: p.domain, category: p.category, status: "עתידי" });
+      }
+    });
+    rows.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    // Calc running total
+    let running = 0;
+    rows.forEach(r => { running += r.amount; r._running = running; });
+    return rows;
+  }, [txns, meta, manualTxns, projections]);
+
+  const months = [...new Set(unified.map(t => t.date?.slice(0, 7)).filter(Boolean))].sort().reverse();
+
+  const filtered = unified.filter(t => {
+    if (month && !t.date?.startsWith(month)) return false;
+    if (typeF === "income" && t.amount <= 0) return false;
+    if (typeF === "expense" && t.amount > 0) return false;
+    if (domainF && t.domain !== domainF) return false;
+    if (catF && t.category !== catF) return false;
     return true;
   });
 
-  const totalIncome=filtered.filter(t=>t.charged_amount>0).reduce((s,t)=>s+t.charged_amount,0);
-  const totalExpense=filtered.filter(t=>t.charged_amount<0).reduce((s,t)=>s+Math.abs(t.charged_amount),0);
-  const balance=totalIncome-totalExpense;
+  const totalIncome = filtered.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const totalExpense = filtered.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const balance = totalIncome - totalExpense;
 
-  // Category breakdown
-  const byCat={};filtered.forEach(t=>{const c=t.category||"ללא קטגוריה";byCat[c]=(byCat[c]||0)+Math.abs(t.charged_amount);});
-  const topCats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const maxCat=topCats[0]?.[1]||1;
+  // Potential matches for confirmation
+  const potentialMatches = useMemo(() => findPotentialMatches(txns, projections), [txns, projections]);
 
-  if(loading)return <div style={S.empty}>טוען תנועות...</div>;
-  return(<div style={{padding:"8px 0 20px"}}>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginBottom:12}}>
-      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800,color:"#10B981"}}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
-      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800,color:"#EF4444"}}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
-      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800,color:balance>=0?"#10B981":"#EF4444"}}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
-      <div style={S.statCard}><div style={{fontSize:22,fontWeight:800}}>{filtered.length}</div><div style={S.statLbl}>תנועות</div></div>
+  if (loading) return <div style={S.empty}>טוען תנועות...</div>;
+  return (
+    <div style={{ padding: "8px 0 20px" }}>
+      {/* Summary cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
+        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: balance >= 0 ? "#10B981" : "#EF4444" }}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800 }}>{filtered.length}</div><div style={S.statLbl}>תנועות</div></div>
+      </div>
+
+      {/* Match alerts */}
+      {potentialMatches.length > 0 && !month && (
+        <div style={{ ...S.statCard, marginBottom: 12, borderRight: "3px solid #F59E0B" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#F59E0B", marginBottom: 4 }}>⚡ תנועות להתאמה ({potentialMatches.length})</div>
+          {potentialMatches.slice(0, 3).map((m, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, padding: "4px 0", borderTop: i > 0 ? "1px solid #1E293B" : "none" }}>
+              <span style={{ flex: 1 }}>{m.proj.description}</span>
+              <span style={{ color: "#94A3B8" }}>→</span>
+              <span style={{ flex: 1 }}>{m.bank.description}</span>
+              <span style={{ color: "#10B981", direction: "ltr" }}>₪{Math.abs(m.bank.charged_amount).toLocaleString()}</span>
+              <button onClick={() => setMatchConfirm(m)} style={{ ...S.btn1, padding: "2px 8px", fontSize: 10 }}>התאמה?</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recurring manager */}
+      <RecurringManager recurring={recurring} onAdd={addRecurring} onUpdate={updateRecurring} onDelete={deleteRecurring} />
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14 }} value={month} onChange={e => setMonth(e.target.value)}><option value="">כל התקופה</option>{months.map(m => <option key={m} value={m}>{new Date(m + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</option>)}</select>
+        <button style={!typeF ? S.filterOn : S.filterOff} onClick={() => setTypeF("")}>הכל</button>
+        <button style={typeF === "income" ? { ...S.filterOn, background: "#10B981" } : S.filterOff} onClick={() => setTypeF(typeF === "income" ? "" : "income")}>הכנסות</button>
+        <button style={typeF === "expense" ? { ...S.filterOn, background: "#EF4444" } : S.filterOff} onClick={() => setTypeF(typeF === "expense" ? "" : "expense")}>הוצאות</button>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: domainF ? "#F59E0B" : "#1E293B", color: domainF ? "#fff" : "#64748B", border: "none" }} value={domainF} onChange={e => setDomainF(e.target.value)}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: catF ? "#8B5CF6" : "#1E293B", color: catF ? "#fff" : "#64748B", border: "none" }} value={catF} onChange={e => setCatF(e.target.value)}><option value="">קטגוריה</option>{ALL_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <div style={{ flex: 1 }} />
+        <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
+      </div>
+
+      {/* Table */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>
+            <th style={S.th}>תאריך</th>
+            <th style={S.th}>תיאור</th>
+            <th style={S.th}>סכום</th>
+            <th style={S.th}>מצטבר</th>
+            <th style={S.th}>תחום</th>
+            <th style={S.th}>קטגוריה</th>
+            <th style={S.th}>תשלום</th>
+            <th style={S.th}>סטטוס</th>
+            <th style={S.th}></th>
+          </tr></thead>
+          <tbody>
+            {filtered.map((t, i) => {
+              const isBank = t._type === "bank";
+              const isManual = t._type === "manual";
+              const isRecurring = t._type === "recurring";
+              const isEd = editId === t._key;
+              const linkedLead = t.linked_lead_id ? leads.find(l => l.id === t.linked_lead_id) : null;
+              const rowBg = isRecurring ? "#0B112080" : isManual ? "#1E293B10" : undefined;
+              const typeIndicator = isRecurring ? "🔄" : isManual ? "✏️" : "";
+
+              if (isEd && isBank) return (
+                <tr key={t._key}>
+                  <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
+                  <td style={S.td}>{t.description}</td>
+                  <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
+                  <td style={{ ...S.td, fontSize: 11, color: t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._running.toLocaleString()}</td>
+                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
+                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => setEf(p => ({ ...p, category: e.target.value }))}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : ef.domain === "home" ? EXPENSE_CATS_HOME : ef.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">—</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></td>
+                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.status || "paid"} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                  <td style={S.td}>
+                    <div style={{ display: "flex", gap: 2 }}>
+                      <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                      {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
+                      <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+
+              return (
+                <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "" }); } : undefined}>
+                  <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
+                  <td style={S.td}>
+                    {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
+                    {t.description}
+                    {t.memo && <span style={{ color: "#475569", fontSize: 11, marginRight: 6 }}> ({t.memo})</span>}
+                    {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11, marginRight: 6 }}> ← {linkedLead.name}</span>}
+                  </td>
+                  <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
+                  <td style={{ ...S.td, fontSize: 11, color: t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._running.toLocaleString()}</td>
+                  <td style={S.td}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}</td>
+                  <td style={S.td}><span style={{ fontSize: 12 }}>{t.category || ""}</span></td>
+                  <td style={S.td}><span style={{ fontSize: 12 }}>{t.payment_method || ""}</span></td>
+                  <td style={S.td}><span style={{ fontSize: 12, color: t.status === "בחוב" ? "#F59E0B" : t.status === "עתידי" ? "#3B82F6" : "#475569" }}>{t.status || ""}</span></td>
+                  <td style={S.td}>
+                    {isBank && (t.category ? <span style={{ color: "#10B981", fontSize: 10 }}>✓</span> : <span style={{ color: "#64748B", fontSize: 10 }}>✎</span>)}
+                    {isManual && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק תנועה ידנית?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {filtered.length === 0 && <p style={S.empty}>אין תנועות</p>}
+
+      {showManualForm && <ManualTxnForm onSave={addManual} onClose={() => setShowManualForm(false)} />}
+      {showLinkModal && <LinkLeadModal leads={leads} onSelect={(leadId) => { const t = filtered.find(x => x._key === showLinkModal); if (t) linkToLead(t._uid, leadId); setShowLinkModal(null); }} onClose={() => setShowLinkModal(null)} />}
+      {matchConfirm && (
+        <Modal onClose={() => setMatchConfirm(null)}>
+          <div style={S.mHead}><h2 style={S.mTitle}>אישור התאמה</h2><button style={S.iconBtn} onClick={() => setMatchConfirm(null)}>{I.x}</button></div>
+          <div style={{ fontSize: 13, marginBottom: 12 }}>
+            <p style={{ marginBottom: 8 }}>תנועה קבועה: <strong>{matchConfirm.proj.description}</strong></p>
+            <p style={{ marginBottom: 8 }}>תנועת בנק: <strong>{matchConfirm.bank.description}</strong></p>
+            <p>סכום: <span style={{ direction: "ltr", display: "inline-block" }}>₪{Math.abs(matchConfirm.bank.charged_amount).toLocaleString()}</span></p>
+          </div>
+          <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>האם זו אותה תנועה?</p>
+          <div style={S.mFoot}>
+            <button style={S.btn2} onClick={() => setMatchConfirm(null)}>לא</button>
+            <button style={S.btn1} onClick={() => { _showToast("✓ הותאם"); setMatchConfirm(null); }}>כן, זו התנועה</button>
+          </div>
+        </Modal>
+      )}
     </div>
-    {topCats.length>0&&<div style={{...S.statCard,marginBottom:12}}><div style={S.statLbl}>פילוח לפי קטגוריה</div>{topCats.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}><span style={{minWidth:80}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/maxCat)*100}%`,background:"#8B5CF6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:50,textAlign:"left",direction:"ltr"}}>₪{c.toLocaleString()}</span></div>)}</div>}
-    <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
-      <select style={{...S.inp,width:"auto",padding:"4px 8px",fontSize:12,borderRadius:14}} value={month} onChange={e=>setMonth(e.target.value)}><option value="">כל התקופה</option>{months.map(m=><option key={m} value={m}>{new Date(m+"-01").toLocaleDateString("he-IL",{month:"long",year:"numeric"})}</option>)}</select>
-      <button style={!typeF?S.filterOn:S.filterOff} onClick={()=>setTypeF("")}>הכל</button>
-      <button style={typeF==="income"?{...S.filterOn,background:"#10B981"}:S.filterOff} onClick={()=>setTypeF(typeF==="income"?"":"income")}>הכנסות</button>
-      <button style={typeF==="expense"?{...S.filterOn,background:"#EF4444"}:S.filterOff} onClick={()=>setTypeF(typeF==="expense"?"":"expense")}>הוצאות</button>
-      <select style={{...S.inp,width:"auto",padding:"4px 8px",fontSize:12,borderRadius:14,background:domainF?"#F59E0B":"#1E293B",color:domainF?"#fff":"#64748B",border:"none"}} value={domainF} onChange={e=>setDomainF(e.target.value)}><option value="">תחום</option>{DOMAINS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select>
-      <select style={{...S.inp,width:"auto",padding:"4px 8px",fontSize:12,borderRadius:14,background:catF?"#8B5CF6":"#1E293B",color:catF?"#fff":"#64748B",border:"none"}} value={catF} onChange={e=>setCatF(e.target.value)}><option value="">קטגוריה</option>{ALL_CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
-    </div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th style={S.th}>תאריך</th><th style={S.th}>תיאור</th><th style={S.th}>סכום</th><th style={S.th}>תחום</th><th style={S.th}>קטגוריה</th><th style={S.th}>תשלום</th><th style={S.th}>סטטוס</th><th style={S.th}></th></tr></thead><tbody>
-      {filtered.map((t,i)=>{const isEd=editId===t._uid;const m=getMeta(t._uid);return isEd?(<tr key={t._uid||i}><td style={S.td}>{t.activity_date?fmtDate(t.activity_date):""}</td><td style={S.td}>{t.description}</td><td style={{...S.td,fontWeight:600,color:t.charged_amount>0?"#10B981":"#EF4444",direction:"ltr",textAlign:"right"}}>₪{Math.abs(t.charged_amount).toLocaleString()}</td>
-        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.domain||""} onChange={e=>setEf(p=>({...p,domain:e.target.value}))}><option value="">—</option>{DOMAINS.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
-        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.category||""} onChange={e=>setEf(p=>({...p,category:e.target.value}))}><option value="">—</option>{(t.charged_amount>0?INCOME_CATS:ef.domain==="home"?EXPENSE_CATS_HOME:ef.domain==="biz"?EXPENSE_CATS_BIZ:[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ]).map(c=><option key={c} value={c}>{c}</option>)}</select></td>
-        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.payment_method||""} onChange={e=>setEf(p=>({...p,payment_method:e.target.value}))}><option value="">—</option>{PAY_METHODS.map(p=><option key={p} value={p}>{p}</option>)}</select></td>
-        <td style={S.td}><select style={{...S.inp,padding:"2px 4px",fontSize:11}} value={ef.status||"paid"} onChange={e=>setEf(p=>({...p,status:e.target.value}))}>{TXN_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></td>
-        <td style={S.td}><button onClick={()=>saveMeta(t._uid,ef)} style={{...S.iconBtn,color:"#10B981"}}>{I.check}</button><button onClick={()=>setEditId(null)} style={{...S.iconBtn,color:"#64748B"}}>{I.x}</button></td>
-      </tr>):(<tr key={t._uid||i} style={{cursor:"pointer"}} onClick={()=>{setEditId(t._uid);setEf({domain:m.domain||"",category:m.category||"",payment_method:m.payment_method||"",status:m.status||"paid",income_source:m.income_source||""});}}>
-        <td style={S.td}>{t.activity_date?fmtDate(t.activity_date):""}</td>
-        <td style={S.td}>{t.description}{t.memo?<span style={{color:"#475569",fontSize:11,marginRight:6}}> ({t.memo})</span>:""}</td>
-        <td style={{...S.td,fontWeight:600,color:t.charged_amount>0?"#10B981":"#EF4444",direction:"ltr",textAlign:"right"}}>₪{Math.abs(t.charged_amount).toLocaleString()}</td>
-        <td style={S.td}>{m.domain?DOMAINS.find(d=>d.id===m.domain)?.label:""}</td>
-        <td style={S.td}><span style={{fontSize:12}}>{m.category||""}</span></td>
-        <td style={S.td}><span style={{fontSize:12}}>{m.payment_method||""}</span></td>
-        <td style={S.td}><span style={{fontSize:12,color:m.status==="בחוב"?"#F59E0B":m.status==="עתידי"?"#3B82F6":"#475569"}}>{m.status||""}</span></td>
-        <td style={S.td}>{m.category?<span style={{color:"#10B981",fontSize:10}}>✓</span>:<span style={{color:"#64748B",fontSize:10}}>✎</span>}</td>
-      </tr>);})}
-    </tbody></table></div>
-    {filtered.length===0&&<p style={S.empty}>אין תנועות</p>}
-  </div>);
+  );
 }
 
+/* ═══════════════════════════
+   DASHBOARD VIEW — charts
+   ═══════════════════════════ */
+
+function DashboardView() {
+  const [txns, setTxns] = useState([]);
+  const [meta, setMeta] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState("monthly");
+  const [year, setYear] = useState(new Date().getFullYear());
+
+  useEffect(() => {
+    Promise.all([
+      sbMoneyman("?order=activity_date.desc&limit=2000"),
+      sb("transaction_meta", "GET", null, "?order=created_at.desc&limit=2000"),
+    ]).then(([t, m]) => { setTxns(t || []); setMeta(m || []); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  const getMeta = (uid) => meta.find(m => m.unique_id === uid) || {};
+
+  const merged = useMemo(() => txns.map(t => {
+    const m = getMeta(t.unique_id);
+    return { ...t, ...m, _uid: t.unique_id };
+  }), [txns, meta]);
+
+  const yearTxns = merged.filter(t => t.activity_date?.startsWith(String(year)));
+
+  // Monthly breakdown
+  const monthlyData = useMemo(() => {
+    const months = {};
+    for (let m = 1; m <= 12; m++) {
+      const key = `${year}-${String(m).padStart(2, "0")}`;
+      months[key] = { income: 0, expense: 0 };
+    }
+    yearTxns.forEach(t => {
+      const key = t.activity_date?.slice(0, 7);
+      if (!key || !months[key]) return;
+      if (t.charged_amount > 0) months[key].income += t.charged_amount;
+      else months[key].expense += Math.abs(t.charged_amount);
+    });
+    return Object.entries(months).map(([k, v]) => ({ month: k, ...v }));
+  }, [yearTxns, year]);
+
+  // Category breakdown for expenses
+  const expenseByCat = useMemo(() => {
+    const cats = {};
+    yearTxns.filter(t => t.charged_amount < 0).forEach(t => {
+      const c = t.category || "ללא קטגוריה";
+      cats[c] = (cats[c] || 0) + Math.abs(t.charged_amount);
+    });
+    return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [yearTxns]);
+
+  // Category breakdown for income
+  const incomeByCat = useMemo(() => {
+    const cats = {};
+    yearTxns.filter(t => t.charged_amount > 0).forEach(t => {
+      const c = t.category || t.income_source || "ללא קטגוריה";
+      cats[c] = (cats[c] || 0) + t.charged_amount;
+    });
+    return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [yearTxns]);
+
+  const PIE_COLORS = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#06B6D4", "#EC4899", "#F97316", "#84CC16", "#6366F1"];
+
+  const totalExpense = expenseByCat.reduce((s, [, v]) => s + v, 0);
+  const totalIncome = incomeByCat.reduce((s, [, v]) => s + v, 0);
+
+  // Pie chart SVG
+  function PieChart({ data, total, title }) {
+    if (total === 0) return <div style={{ ...S.statCard, textAlign: "center" }}><div style={S.statLbl}>{title}</div><p style={S.empty}>אין נתונים</p></div>;
+    let cumAngle = 0;
+    const slices = data.map(([name, val], i) => {
+      const pct = val / total;
+      const startAngle = cumAngle;
+      const endAngle = cumAngle + pct * 360;
+      cumAngle = endAngle;
+      const start = polarToCartesian(100, 100, 80, startAngle);
+      const end = polarToCartesian(100, 100, 80, endAngle);
+      const largeArc = pct > 0.5 ? 1 : 0;
+      const d = `M 100 100 L ${start.x} ${start.y} A 80 80 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+      return { name, val, pct, d, color: PIE_COLORS[i % PIE_COLORS.length] };
+    });
+    return (
+      <div style={S.statCard}>
+        <div style={S.statLbl}>{title}</div>
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <svg viewBox="0 0 200 200" width="160" height="160" style={{ flexShrink: 0 }}>
+            {slices.map((s, i) => <path key={i} d={s.d} fill={s.color} stroke="#111827" strokeWidth="1" />)}
+          </svg>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 120 }}>
+            {slices.map((s, i) => (
+              <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{s.name}</span>
+                <span style={{ color: "#94A3B8", direction: "ltr" }}>₪{s.val.toLocaleString()}</span>
+                <span style={{ color: "#475569", minWidth: 30, textAlign: "left" }}>{Math.round(s.pct * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Bar chart SVG
+  function BarChart({ data }) {
+    const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1);
+    const barW = 30;
+    const gap = 12;
+    const chartW = data.length * (barW * 2 + gap) + 40;
+    const chartH = 200;
+    return (
+      <div style={S.statCard}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={S.statLbl}>הכנסות מול הוצאות — חודשי</div>
+          <div style={{ display: "flex", gap: 10, fontSize: 11 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#10B981" }} />הכנסות</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#EF4444" }} />הוצאות</span>
+          </div>
+        </div>
+        <div style={{ overflowX: "auto", marginTop: 8 }}>
+          <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} width={chartW} height={chartH + 30}>
+            {data.map((d, i) => {
+              const x = 20 + i * (barW * 2 + gap);
+              const hIncome = (d.income / maxVal) * chartH;
+              const hExpense = (d.expense / maxVal) * chartH;
+              const label = new Date(d.month + "-01").toLocaleDateString("he-IL", { month: "short" });
+              return (
+                <g key={d.month}>
+                  <rect x={x} y={chartH - hIncome} width={barW} height={hIncome} fill="#10B981" rx="3" />
+                  <rect x={x + barW + 2} y={chartH - hExpense} width={barW} height={hExpense} fill="#EF4444" rx="3" />
+                  <text x={x + barW} y={chartH + 16} textAnchor="middle" fill="#64748B" fontSize="10" fontFamily="Rubik">{label}</text>
+                </g>
+              );
+            })}
+            <line x1="20" y1={chartH} x2={chartW} y2={chartH} stroke="#1E293B" strokeWidth="1" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  const years = [...new Set(txns.map(t => t.activity_date?.slice(0, 4)).filter(Boolean))].sort().reverse();
+
+  if (loading) return <div style={S.empty}>טוען נתונים...</div>;
+  return (
+    <div style={{ padding: "8px 0 20px" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, alignItems: "center" }}>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14 }} value={year} onChange={e => setYear(Number(e.target.value))}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select>
+      </div>
+
+      {/* Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8, marginBottom: 12 }}>
+        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>סה״כ הכנסות {year}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>סה״כ הוצאות {year}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: totalIncome - totalExpense >= 0 ? "#10B981" : "#EF4444" }}>₪{(totalIncome - totalExpense).toLocaleString()}</div><div style={S.statLbl}>מאזן {year}</div></div>
+      </div>
+
+      {/* Bar chart */}
+      <BarChart data={monthlyData} />
+
+      {/* Pie charts */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+        <PieChart data={expenseByCat} total={totalExpense} title="פילוג הוצאות לפי קטגוריה" />
+        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות" />
+      </div>
+    </div>
+  );
+}
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function Stats({leads}){const total=leads.length;const byStatus=STATUSES.map(s=>({...s,count:leads.filter(l=>l.status===s.id).length}));const closed=byStatus.find(s=>s.id==="closed")?.count||0;const lost=byStatus.find(s=>s.id==="lost")?.count||0;const decided=closed+lost;const rate=decided>0?Math.round((closed/decided)*100):0;const revenue=leads.filter(l=>l.status==="closed").reduce((s,l)=>s+(l.amount||0),0);const byService={};leads.forEach(l=>{if(l.service)byService[l.service]=(byService[l.service]||0)+1;});const topSvc=Object.entries(byService).sort((a,b)=>b[1]-a[1]).slice(0,6);const bySource={};leads.forEach(l=>{if(l.source)bySource[l.source]=(bySource[l.source]||0)+1;});const topSrc=Object.entries(bySource).sort((a,b)=>b[1]-a[1]).slice(0,6);const mx=a=>a[0]?.[1]||1;return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,padding:"8px 0 20px"}}><div style={S.statCard}><div style={{fontSize:36,fontWeight:800}}>{total}</div><div style={S.statLbl}>סה״כ</div></div><div style={S.statCard}><div style={{fontSize:36,fontWeight:800,color:"#10B981"}}>{rate}%</div><div style={S.statLbl}>המרה</div></div><div style={S.statCard}><div style={{fontSize:28,fontWeight:800,color:"#3B82F6"}}>₪{revenue.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div><div style={S.statCard}>{byStatus.map(s=><div key={s.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}><span style={{width:8,height:8,borderRadius:"50%",background:s.color}}/><span style={{flex:1}}>{s.label}</span><span style={{fontWeight:700}}>{s.count}</span></div>)}</div>{topSvc.length>0&&<div style={S.statCard}><div style={S.statLbl}>שירותים</div>{topSvc.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}><span style={{minWidth:70}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/mx(topSvc))*100}%`,background:"#3B82F6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:16,textAlign:"center"}}>{c}</span></div>)}</div>}{topSrc.length>0&&<div style={S.statCard}><div style={S.statLbl}>מקורות</div>{topSrc.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}><span style={{minWidth:70}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/mx(topSrc))*100}%`,background:"#8B5CF6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:16,textAlign:"center"}}>{c}</span></div>)}</div>}</div>);}
+
+/* ═══════════════════════
+   MAIN APP
+   ═══════════════════════ */
+
 export default function App(){
-  const [leads,setLeads]=useState([]);const [interactions,setInteractions]=useState([]);const [tasks,setTasks]=useState([]);const [sessions,setSessions]=useState([]);const [packages,setPackages]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState(null);const [view,setView]=useState("leads");const [leadsMode,setLeadsMode]=useState("board");const [showForm,setShowForm]=useState(false);const [showNotifs,setShowNotifs]=useState(false);const [selectedLead,setSelectedLead]=useState(null);const [search,setSearch]=useState("");const [serviceFilter,setServiceFilter]=useState("");const [statusFilter,setStatusFilter]=useState("");const [sourceFilter,setSourceFilter]=useState("");const [taskFilter,setTaskFilter]=useState(false);const [dragId,setDragId]=useState(null);const toast=useToast();const notifs=useNotifications(leads,tasks,interactions);
+  const [leads,setLeads]=useState([]);const [interactions,setInteractions]=useState([]);const [tasks,setTasks]=useState([]);const [sessions,setSessions]=useState([]);const [packages,setPackages]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState(null);
+  const [section,setSection]=useState("crm");
+  const [view,setView]=useState("leads");
+  const [leadsMode,setLeadsMode]=useState("board");const [showForm,setShowForm]=useState(false);const [showNotifs,setShowNotifs]=useState(false);const [selectedLead,setSelectedLead]=useState(null);const [search,setSearch]=useState("");const [serviceFilter,setServiceFilter]=useState("");const [statusFilter,setStatusFilter]=useState("");const [sourceFilter,setSourceFilter]=useState("");const [taskFilter,setTaskFilter]=useState(false);const [dragId,setDragId]=useState(null);const toast=useToast();const notifs=useNotifications(leads,tasks,interactions);
 
   const load=useCallback(async()=>{try{const [l,i,t,s,pk]=await Promise.all([sb("leads","GET",null,"?order=updated_at.desc"),sb("interactions","GET",null,"?order=date.desc"),sb("tasks","GET",null,"?order=due_date.asc"),sb("podcast_sessions","GET",null,"?order=session_date.asc"),sb("podcast_packages","GET",null,"?order=created_at.desc")]);setLeads(l||[]);setInteractions(i||[]);setTasks(t||[]);setSessions(s||[]);setPackages(pk||[]);setError(null);}catch(e){setError(e.message);}finally{setLoading(false);}},[]);
   useEffect(()=>{load();},[load]);
@@ -242,14 +739,60 @@ export default function App(){
   const deletePackage=async id=>{try{await sb("podcast_sessions","DELETE",null,`?package_id=eq.${id}`);await sb("podcast_packages","DELETE",null,`?id=eq.${id}`);setSessions(p=>p.filter(s=>s.package_id!==id));setPackages(pk=>pk.filter(p=>p.id!==id));}catch(e){setError(e.message);}};
   const filtered=leads.filter(l=>{if(search&&!l.name?.includes(search)&&!l.phone?.includes(search)&&!l.service?.includes(search))return false;if(serviceFilter&&l.service!==serviceFilter)return false;if(statusFilter&&l.status!==statusFilter)return false;if(sourceFilter&&l.source!==sourceFilter)return false;if(taskFilter&&!tasks.some(t=>t.lead_id===l.id&&!t.completed))return false;return true;});
 
+  // Section/view sync
+  const switchSection = (s) => {
+    setSection(s);
+    if (s === "crm") setView("leads");
+    else setView("cashflow");
+  };
+
+  const CRM_TABS = [
+    { id: "leads", label: "לידים" },
+    { id: "clients", label: "לקוחות" },
+    { id: "tasks", label: "משימות" },
+    { id: "stats", label: "נתונים" },
+  ];
+  const FIN_TABS = [
+    { id: "cashflow", label: "תזרים" },
+    { id: "dashboard", label: "דאשבורד" },
+  ];
+  const activeTabs = section === "crm" ? CRM_TABS : FIN_TABS;
+
   if(loading)return <div style={{...S.app,display:"flex",justifyContent:"center",alignItems:"center",height:"100vh"}}><div style={{textAlign:"center"}}><div style={{fontSize:24,marginBottom:8}}>🎤</div><div style={{color:"#64748B"}}>טוען...</div></div></div>;
   if(error)return <div style={{...S.app,display:"flex",justifyContent:"center",alignItems:"center",height:"100vh"}}><div style={{textAlign:"center",color:"#EF4444"}}><div style={{fontSize:16,marginBottom:8}}>שגיאה</div><div style={{fontSize:13,color:"#64748B",marginBottom:12,maxWidth:400,wordBreak:"break-all"}}>{error}</div><button style={S.btn1} onClick={()=>{setError(null);setLoading(true);load();}}>נסה שוב</button></div></div>;
 
   if(selectedLead){const fresh=leads.find(l=>l.id===selectedLead.id);if(!fresh){setSelectedLead(null);return null;}return <div style={S.app}><LeadDetail lead={fresh} interactions={interactions} tasks={tasks} sessions={sessions} packages={packages} onBack={()=>setSelectedLead(null)} onUpdate={updateLead} onDelete={deleteLead} onAddInteraction={addInteraction} onUpdateInteraction={updateInteraction} onDeleteInteraction={deleteInteraction} onAddTask={addTask} onUpdateTask={updateTask} onToggleTask={toggleTask} onDeleteTask={deleteTask} onAddSession={addSession} onUpdateSession={updateSession} onDeleteSession={deleteSession} onAddPackage={addPackage} onUpdatePackage={updatePackage} onDeletePackage={deletePackage}/><Toast {...toast}/></div>;}
 
   return(<div style={S.app}>
-  <div style={S.header}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><h1 style={{fontSize:20,fontWeight:800,margin:0}}>🎤 אולפני הנסיכה <span style={{fontSize:12,fontWeight:500,color:"#8B5CF6"}}>CRM</span></h1><div style={{display:"flex",gap:6,alignItems:"center"}}><button style={{...S.iconBtn,position:"relative"}} onClick={()=>setShowNotifs(true)}>{I.bell}{notifs.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#EF4444",color:"#fff",fontSize:10,fontWeight:700,width:16,height:16,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{notifs.length}</span>}</button><button style={S.addBtn} onClick={()=>setShowForm(true)}>{I.plus} ליד חדש</button></div></div>
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={S.searchBox}>{I.search}<input style={S.searchInp} value={search} onChange={e=>setSearch(e.target.value)} placeholder="חיפוש..."/></div><div style={S.tabs}><button style={view==="leads"?S.tabOn:S.tabOff} onClick={()=>{if(view==="leads")setLeadsMode(leadsMode==="board"?"list":"board");else setView("leads");}}>לידים {view==="leads"&&<span style={{fontSize:10,opacity:0.7}}>({leadsMode==="board"?"לוח":"רשימה"})</span>}</button><button style={view==="clients"?S.tabOn:S.tabOff} onClick={()=>setView("clients")}>לקוחות</button><button style={view==="tasks"?S.tabOn:S.tabOff} onClick={()=>setView("tasks")}>משימות</button><button style={view==="finances"?S.tabOn:S.tabOff} onClick={()=>setView("finances")}>כספים</button><button style={view==="stats"?S.tabOn:S.tabOff} onClick={()=>setView("stats")}>נתונים</button></div></div></div>
+  <div style={S.header}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+      <h1 style={{fontSize:20,fontWeight:800,margin:0}}>🎤 אולפני הנסיכה</h1>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <button style={{...S.iconBtn,position:"relative"}} onClick={()=>setShowNotifs(true)}>{I.bell}{notifs.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#EF4444",color:"#fff",fontSize:10,fontWeight:700,width:16,height:16,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{notifs.length}</span>}</button>
+        {section==="crm"&&<button style={S.addBtn} onClick={()=>setShowForm(true)}>{I.plus} ליד חדש</button>}
+      </div>
+    </div>
+    {/* Section selector */}
+    <div style={{display:"flex",gap:4,marginBottom:6}}>
+      <button onClick={()=>switchSection("crm")} style={{border:"none",padding:"4px 14px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:section==="crm"?700:500,background:section==="crm"?"#8B5CF6":"transparent",color:section==="crm"?"#fff":"#64748B"}}>CRM</button>
+      <button onClick={()=>switchSection("finances")} style={{border:"none",padding:"4px 14px",borderRadius:8,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:section==="finances"?700:500,background:section==="finances"?"#10B981":"transparent",color:section==="finances"?"#fff":"#64748B"}}>כספים</button>
+    </div>
+    {/* Sub-tabs */}
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+      {section==="crm"&&<div style={S.searchBox}>{I.search}<input style={S.searchInp} value={search} onChange={e=>setSearch(e.target.value)} placeholder="חיפוש..."/></div>}
+      <div style={S.tabs}>
+        {activeTabs.map(tab=>(
+          <button key={tab.id} style={view===tab.id?S.tabOn:S.tabOff} onClick={()=>{
+            if(tab.id==="leads"&&view==="leads") setLeadsMode(leadsMode==="board"?"list":"board");
+            else setView(tab.id);
+          }}>
+            {tab.label}
+            {tab.id==="leads"&&view==="leads"&&<span style={{fontSize:10,opacity:0.7}}> ({leadsMode==="board"?"לוח":"רשימה"})</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
 
   {view==="leads"&&<div style={{display:"flex",gap:4,flexWrap:"wrap",padding:"6px 0",alignItems:"center"}}><button style={!serviceFilter&&!taskFilter&&!statusFilter&&!sourceFilter?S.filterOn:S.filterOff} onClick={()=>{setServiceFilter("");setTaskFilter(false);setStatusFilter("");setSourceFilter("");}}>הכל</button>{STATUSES.map(s=>{const c=leads.filter(l=>l.status===s.id).length;if(c===0)return null;return <button key={s.id} style={statusFilter===s.id?{...S.filterOn,background:s.color}:S.filterOff} onClick={()=>setStatusFilter(statusFilter===s.id?"":s.id)}>{s.label} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/>{SERVICES.map(svc=>{const c=leads.filter(l=>l.service===svc).length;if(c===0)return null;return <button key={svc} style={serviceFilter===svc?S.filterOn:S.filterOff} onClick={()=>setServiceFilter(serviceFilter===svc?"":svc)}>{svc} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><select style={{...S.inp,width:"auto",padding:"3px 8px",fontSize:12,borderRadius:14,background:sourceFilter?"#F59E0B":"#1E293B",color:sourceFilter?"#fff":"#64748B",border:"none",fontWeight:sourceFilter?600:400}} value={sourceFilter} onChange={e=>setSourceFilter(e.target.value)}><option value="">מקור</option>{SOURCES.map(src=>{const c=leads.filter(l=>l.source===src).length;if(c===0)return null;return <option key={src} value={src}>{src} ({c})</option>;})}</select><span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><button style={taskFilter?{...S.filterOn,background:"#3B82F6"}:S.filterOff} onClick={()=>setTaskFilter(!taskFilter)}>📋 משימות</button></div>}
 
@@ -259,7 +802,8 @@ export default function App(){
 
   {view==="clients"&&<ClientsView leads={leads} onSelect={setSelectedLead}/>}
   {view==="tasks"&&<TasksView tasks={tasks} leads={leads} onToggle={toggleTask} onDelete={deleteTask}/>}
-  {view==="finances"&&<FinancesView/>}
+  {view==="cashflow"&&<CashflowView leads={leads}/>}
+  {view==="dashboard"&&<DashboardView/>}
   {view==="stats"&&<Stats leads={leads}/>}
   {showForm&&<LeadForm onSave={addLead} onClose={()=>setShowForm(false)}/>}
   {showNotifs&&<NotifPanel notifs={notifs} onClose={()=>setShowNotifs(false)} onSelect={id=>{const l=leads.find(x=>x.id===id);if(l)setSelectedLead(l);}}/>}
