@@ -136,9 +136,47 @@ const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תח�
 const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית"];
 const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
 const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"utility",label:"utility"}];
-const INCOME_SOURCES=["אולפן","בית ריק","הפקה","פודקאסטים","בקליין","הופעות","שוכרי משנה","מיקסים"];
+const INCOME_SOURCES=["הקלטה","מיקס","הפקה","הפקה - אפיק","לייב סשן","פודקאסט","צילום קורס","השכרת חלל","בית ריק","ייעוץ אומנותי - נימשי","ייעוץ אומנותי - אפיק","בקליין","הופעות","שוכרי משנה","מיקסים","אחר"];
 const PAY_METHODS=["אשראי","העברה","מזומן","הוראת קבע","ביט","פייבוקס","אחר"];
 const TXN_STATUSES=["שולם/התקבל","בחוב","עתידי"];
+
+// Auto-categorization: business name → category map
+const AUTO_CAT_MAP = {
+  "דור אלון": "דלק", "פז ": "דלק", "סונול": "דלק", "דלק": "דלק", "ten ": "דלק", "yellow": "דלק",
+  "שופרסל": "מזון", "רמי לוי": "מזון", "מגה": "מזון", "ויקטורי": "מזון", "יוחננוף": "מזון", "אושר עד": "מזון", "חצי חינם": "מזון", "סופר": "מזון", "פרש מרקט": "מזון", "טיב טעם": "מזון", "יינות ביתן": "מזון", "am:pm": "מזון",
+  "מקדונלד": "אוכל בחוץ", "ארומה": "אוכל בחוץ", "קפה": "אוכל בחוץ", "מסעדה": "אוכל בחוץ", "פיצה": "אוכל בחוץ", "בורגר": "אוכל בחוץ", "סושי": "אוכל בחוץ", "wolt": "אוכל בחוץ", "תן ביס": "אוכל בחוץ",
+  "סופר פארם": "פארם", "פארם": "פארם", "be ": "פארם",
+  "הראל": "ביטוחים", "מגדל": "ביטוחים", "כלל ביטוח": "ביטוחים", "הפניקס": "ביטוחים", "ביטוח": "ביטוחים", "פנסיה": "ביטוחים",
+  "google": "תוכנות", "apple": "תוכנות", "spotify": "תוכנות", "netflix": "תוכנות", "adobe": "תוכנות", "amazon": "תוכנות", "microsoft": "תוכנות", "openai": "תוכנות", "anthropic": "תוכנות", "github": "תוכנות",
+  "חניון": "תחבצ וחניונים", "חניה": "תחבצ וחניונים", "רב קו": "תחבצ וחניונים", "רכבת": "תחבצ וחניונים", "אגד": "תחבצ וחניונים", "דן ": "תחבצ וחניונים",
+  "טסט": "תחזוקת רכב", "מוסך": "תחזוקת רכב", "צמיגים": "תחזוקת רכב",
+  "כושר": "כושר", "הולמס": "כושר", "gym": "כושר",
+};
+
+function autoCategoryFromMap(description, learnedCats) {
+  if (!description) return "";
+  const desc = description.trim();
+  if (learnedCats && learnedCats[desc]) return learnedCats[desc];
+  const lower = desc.toLowerCase();
+  for (const [key, cat] of Object.entries(AUTO_CAT_MAP)) {
+    if (lower.includes(key.toLowerCase())) return cat;
+  }
+  return "";
+}
+
+function buildLearnedCats(meta, txns) {
+  const map = {};
+  meta.forEach(m => {
+    if (m.category && m.unique_id) {
+      const txn = txns.find(t => t.unique_id === m.unique_id);
+      if (txn?.description) {
+        const desc = txn.description.trim();
+        if (!map[desc]) map[desc] = m.category;
+      }
+    }
+  });
+  return map;
+}
 
 /* ═══════════════════════════════════════════
    CASHFLOW VIEW — replaces old FinancesView
@@ -147,9 +185,10 @@ const TXN_STATUSES=["שולם/התקבל","בחוב","עתידי"];
 function generateRecurringProjections(recurring) {
   const projections = [];
   const now = new Date();
-  const endDate = new Date("2026-12-31");
+  const defaultEnd = new Date("2026-12-31");
   for (const r of recurring) {
     if (!r.is_active) continue;
+    const endDate = r.end_date ? new Date(r.end_date) : defaultEnd;
     let d = new Date(now.getFullYear(), now.getMonth(), r.day_of_month || 1);
     if (d < now) d.setMonth(d.getMonth() + 1);
     while (d <= endDate) {
@@ -161,6 +200,7 @@ function generateRecurringProjections(recurring) {
         amount: r.type === "expense" ? -Math.abs(r.amount) : Math.abs(r.amount),
         domain: r.domain || "",
         category: r.category || "",
+        income_source: r.income_source || "",
         status: "עתידי",
       });
       d = new Date(d);
@@ -212,7 +252,7 @@ function LinkLeadModal({ leads, onSelect, onClose }) {
 }
 
 function ManualTxnForm({ onSave, onClose }) {
-  const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "" });
+  const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "", includes_vat: "", vat_deductible: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), status: "planned" }); onClose(); };
   return (
@@ -225,6 +265,8 @@ function ManualTxnForm({ onSave, onClose }) {
         <div><label style={S.lbl}>סכום *</label><input style={S.inp} type="number" value={f.amount} onChange={e => set("amount", e.target.value)} dir="ltr" /></div>
         <div><label style={S.lbl}>תחום</label><select style={S.inp} value={f.domain} onChange={e => set("domain", e.target.value)}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
         <div style={S.full}><label style={S.lbl}>קטגוריה</label><select style={S.inp} value={f.category} onChange={e => set("category", e.target.value)}><option value="">—</option>{(f.type === "income" ? INCOME_CATS : f.domain === "home" ? EXPENSE_CATS_HOME : f.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+        <div><label style={S.lbl}>כולל מע״מ</label><select style={S.inp} value={f.includes_vat} onChange={e => set("includes_vat", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option></select></div>
+        {f.includes_vat === "כן" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
         <div style={S.full}><label style={S.lbl}>הערות</label><input style={S.inp} value={f.notes} onChange={e => set("notes", e.target.value)} placeholder="הערות" /></div>
       </div>
       <div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.description.trim() || !f.amount}>שמור</button></div>
@@ -233,9 +275,9 @@ function ManualTxnForm({ onSave, onClose }) {
 }
 
 function RecurringForm({ onSave, onClose }) {
-  const [f, setF] = useState({ description: "", amount: "", type: "expense", domain: "", category: "", day_of_month: 1 });
+  const [f, setF] = useState({ description: "", amount: "", type: "expense", domain: "", category: "", day_of_month: 1, end_date: "", income_source: "", includes_vat: "", vat_deductible: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), is_active: true }); onClose(); };
+  const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), is_active: true, end_date: f.end_date || null }); onClose(); };
   return (
     <Modal onClose={onClose}>
       <div style={S.mHead}><h2 style={S.mTitle}>תנועה קבועה חדשה</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div>
@@ -246,6 +288,10 @@ function RecurringForm({ onSave, onClose }) {
         <div><label style={S.lbl}>יום בחודש</label><input style={S.inp} type="number" value={f.day_of_month} onChange={e => set("day_of_month", Number(e.target.value))} min={1} max={28} dir="ltr" /></div>
         <div><label style={S.lbl}>תחום</label><select style={S.inp} value={f.domain} onChange={e => set("domain", e.target.value)}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
         <div style={S.full}><label style={S.lbl}>קטגוריה</label><select style={S.inp} value={f.category} onChange={e => set("category", e.target.value)}><option value="">—</option>{(f.type === "income" ? INCOME_CATS : f.domain === "home" ? EXPENSE_CATS_HOME : f.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+        <div><label style={S.lbl}>כולל מע״מ</label><select style={S.inp} value={f.includes_vat} onChange={e => set("includes_vat", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option></select></div>
+        {f.includes_vat === "כן" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
+        {f.type === "income" && <div style={S.full}><label style={S.lbl}>מקור הכנסה</label><select style={S.inp} value={f.income_source} onChange={e => set("income_source", e.target.value)}><option value="">—</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>}
+        <div style={S.full}><label style={S.lbl}>תאריך סיום (אופציונלי)</label><input style={S.inp} type="date" value={f.end_date} onChange={e => set("end_date", e.target.value)} dir="ltr" /></div>
       </div>
       <div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.description.trim() || !f.amount}>שמור</button></div>
     </Modal>
@@ -264,11 +310,12 @@ function RecurringManager({ recurring, onAdd, onUpdate, onDelete }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
         {active.map(r => (
-          <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "6px 10px", fontSize: 12 }}>
+          <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "6px 10px", fontSize: 12 }} title={r.end_date ? `סיום: ${fmtDateFull(r.end_date)}` : ""}>
             <span style={{ flex: 1 }}>{r.description}</span>
             <span style={{ color: r.type === "income" ? "#10B981" : "#EF4444", fontWeight: 600, direction: "ltr" }}>₪{Math.abs(r.amount).toLocaleString()}</span>
             <span style={{ color: "#475569", fontSize: 11 }}>יום {r.day_of_month}</span>
             {r.domain && <span style={{ fontSize: 10, color: "#64748B" }}>{DOMAINS.find(d => d.id === r.domain)?.label}</span>}
+            {r.income_source && <span style={{ fontSize: 10, color: "#3B82F6" }}>{r.income_source}</span>}
             <button onClick={() => onUpdate(r.id, { is_active: false })} style={{ ...S.iconBtn, color: "#F59E0B", fontSize: 11 }}>⏸</button>
             <button onClick={() => { if (confirm("למחוק?")) onDelete(r.id); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
           </div>
@@ -364,55 +411,8 @@ function CashflowView({ leads }) {
     _showToast("✓ קושר ללקוח");
   };
 
-  // Auto-categorization: built-in business name → category map
-  const AUTO_CAT_MAP = {
-    // דלק
-    "דור אלון": "דלק", "פז ": "דלק", "סונול": "דלק", "דלק": "דלק", "ten ": "דלק", "yellow": "דלק",
-    // מזון
-    "שופרסל": "מזון", "רמי לוי": "מזון", "מגה": "מזון", "ויקטורי": "מזון", "יוחננוף": "מזון", "אושר עד": "מזון", "חצי חינם": "מזון", "סופר": "מזון", "פרש מרקט": "מזון", "טיב טעם": "מזון", "יינות ביתן": "מזון", "am:pm": "מזון",
-    // אוכל בחוץ
-    "מקדונלד": "אוכל בחוץ", "ארומה": "אוכל בחוץ", "קפה": "אוכל בחוץ", "מסעדה": "אוכל בחוץ", "פיצה": "אוכל בחוץ", "בורגר": "אוכל בחוץ", "סושי": "אוכל בחוץ", "wolt": "אוכל בחוץ", "תן ביס": "אוכל בחוץ",
-    // פארם
-    "סופר פארם": "פארם", "פארם": "פארם", "be ": "פארם",
-    // ביטוחים
-    "הראל": "ביטוחים", "מגדל": "ביטוחים", "כלל ביטוח": "ביטוחים", "הפניקס": "ביטוחים", "ביטוח": "ביטוחים", "פנסיה": "ביטוחים",
-    // תוכנות
-    "google": "תוכנות", "apple": "תוכנות", "spotify": "תוכנות", "netflix": "תוכנות", "adobe": "תוכנות", "amazon": "תוכנות", "microsoft": "תוכנות", "openai": "תוכנות", "anthropic": "תוכנות", "github": "תוכנות",
-    // תחבצ וחניונים
-    "חניון": "תחבצ וחניונים", "חניה": "תחבצ וחניונים", "רב קו": "תחבצ וחניונים", "רכבת": "תחבצ וחניונים", "אגד": "תחבצ וחניונים", "דן ": "תחבצ וחניונים",
-    // תחזוקת רכב
-    "טסט": "תחזוקת רכב", "מוסך": "תחזוקת רכב", "צמיגים": "תחזוקת רכב",
-    // כושר
-    "כושר": "כושר", "הולמס": "כושר", "gym": "כושר",
-  };
-
-  // Learn categories from previously categorized transactions
-  const learnedCats = useMemo(() => {
-    const map = {};
-    meta.forEach(m => {
-      if (m.category && m.unique_id) {
-        const txn = txns.find(t => t.unique_id === m.unique_id);
-        if (txn?.description) {
-          const desc = txn.description.trim();
-          if (!map[desc]) map[desc] = m.category;
-        }
-      }
-    });
-    return map;
-  }, [meta, txns]);
-
-  const autoCategory = (description) => {
-    if (!description) return "";
-    const desc = description.trim();
-    // First check learned categories (exact match)
-    if (learnedCats[desc]) return learnedCats[desc];
-    // Then check built-in map (partial match)
-    const lower = desc.toLowerCase();
-    for (const [key, cat] of Object.entries(AUTO_CAT_MAP)) {
-      if (lower.includes(key.toLowerCase())) return cat;
-    }
-    return "";
-  };
+  const learnedCats = useMemo(() => buildLearnedCats(meta, txns), [meta, txns]);
+  const autoCategory = (description) => autoCategoryFromMap(description, learnedCats);
 
   // Build unified timeline
   const projections = useMemo(() => generateRecurringProjections(recurring), [recurring]);
@@ -670,8 +670,14 @@ function CashflowView({ leads }) {
                       <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
                       <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
                       <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => setEf(p => ({ ...p, category: e.target.value }))}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : ef.domain === "home" ? EXPENSE_CATS_HOME : ef.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">—</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.status || "paid"} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                      <td style={S.td}>
+                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, marginBottom: 3 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10 }} value={ef.includes_vat || ""} onChange={e => setEf(p => ({ ...p, includes_vat: e.target.value }))}><option value="">כולל מע״מ?</option><option value="כן">כולל מע״מ</option><option value="לא">ללא מע״מ</option></select>
+                      </td>
+                      <td style={S.td}>
+                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, marginBottom: 3 }} value={ef.status || "paid"} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        {ef.includes_vat === "כן" && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10 }} value={ef.vat_deductible || ""} onChange={e => setEf(p => ({ ...p, vat_deductible: e.target.value }))}><option value="">מוכר למע״מ?</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select>}
+                      </td>
                       <td style={S.td}>
                         <div style={{ display: "flex", gap: 2 }}>
                           <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
@@ -686,7 +692,7 @@ function CashflowView({ leads }) {
 
                 // Normal row
                 rows.push(
-                  <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "" }); } : undefined}>
+                  <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : undefined}>
                     <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
                     <td style={S.td}>
                       {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
@@ -756,10 +762,14 @@ function DashboardView() {
 
   const getMeta = (uid) => meta.find(m => m.unique_id === uid) || {};
 
+  const learnedCats = useMemo(() => buildLearnedCats(meta, txns), [meta, txns]);
+
   const merged = useMemo(() => txns.map(t => {
     const m = getMeta(t.unique_id);
-    return { ...t, ...m, _uid: t.unique_id };
-  }), [txns, meta]);
+    const savedCat = m.category || "";
+    const autoCat = !savedCat ? autoCategoryFromMap(t.description, learnedCats) : "";
+    return { ...t, ...m, category: savedCat || autoCat, _uid: t.unique_id };
+  }), [txns, meta, learnedCats]);
 
   const yearTxns = merged.filter(t => t.activity_date?.startsWith(String(year)));
 
@@ -803,6 +813,26 @@ function DashboardView() {
 
   const totalExpense = expenseByCat.reduce((s, [, v]) => s + v, 0);
   const totalIncome = incomeByCat.reduce((s, [, v]) => s + v, 0);
+
+  // VAT calculation
+  const vatData = useMemo(() => {
+    let vatIncome = 0;
+    let vatExpense = 0;
+    yearTxns.forEach(t => {
+      const inclVat = t.includes_vat || "";
+      const vatDed = t.vat_deductible || "";
+      if (inclVat !== "כן") return;
+      const amt = Math.abs(t.charged_amount);
+      const vat18 = amt * 18 / 118;
+      if (t.charged_amount > 0) {
+        vatIncome += vat18;
+      } else {
+        if (vatDed === "כן") vatExpense += vat18;
+        else if (vatDed === "רכב") vatExpense += vat18 * 2 / 3;
+      }
+    });
+    return { vatIncome: Math.round(vatIncome), vatExpense: Math.round(vatExpense), vatPayment: Math.round(vatIncome - vatExpense) };
+  }, [yearTxns]);
 
   // Pie chart SVG
   function PieChart({ data, total, title }) {
@@ -902,6 +932,26 @@ function DashboardView() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <PieChart data={expenseByCat} total={totalExpense} title="פילוג הוצאות לפי קטגוריה" />
         <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות" />
+      </div>
+
+      {/* VAT summary */}
+      <div style={{ ...S.statCard, marginTop: 12 }}>
+        <div style={S.statLbl}>מע״מ — {year}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8, marginTop: 6 }}>
+          <div style={{ background: "#0F172A", borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#10B981" }}>₪{vatData.vatIncome.toLocaleString()}</div>
+            <div style={{ fontSize: 11, color: "#64748B" }}>מע״מ הכנסות</div>
+          </div>
+          <div style={{ background: "#0F172A", borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#3B82F6" }}>₪{vatData.vatExpense.toLocaleString()}</div>
+            <div style={{ fontSize: 11, color: "#64748B" }}>מע״מ הוצאות (מוכר)</div>
+          </div>
+          <div style={{ background: "#0F172A", borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: vatData.vatPayment >= 0 ? "#EF4444" : "#10B981" }}>₪{vatData.vatPayment.toLocaleString()}</div>
+            <div style={{ fontSize: 11, color: "#64748B" }}>תשלום מע״מ משוער</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 10, color: "#475569", marginTop: 6 }}>* חישוב מבוסס על תנועות שסומנו "כולל מע״מ". מע״מ = 18%. רכב = שני שליש.</div>
       </div>
     </div>
   );
