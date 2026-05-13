@@ -133,7 +133,7 @@ function NotifPanel({notifs,onClose,onSelect}){return(<Modal onClose={onClose}><
 
 const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר"];
 const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תחזוקת רכב","דלק","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
-const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית"];
+const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה"];
 const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
 const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"utility",label:"utility"}];
 const INCOME_SOURCES=["הקלטה","מיקס","הפקה","הפקה - אפיק","לייב סשן","פודקאסט","צילום קורס","השכרת חלל","בית ריק","ייעוץ אומנותי - נימשי","ייעוץ אומנותי - אפיק","בקליין","הופעות","שוכרי משנה","מיקסים","אחר"];
@@ -266,7 +266,7 @@ function ManualTxnForm({ onSave, onClose }) {
         <div><label style={S.lbl}>תחום</label><select style={S.inp} value={f.domain} onChange={e => set("domain", e.target.value)}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
         <div style={S.full}><label style={S.lbl}>קטגוריה</label><select style={S.inp} value={f.category} onChange={e => set("category", e.target.value)}><option value="">—</option>{(f.type === "income" ? INCOME_CATS : f.domain === "home" ? EXPENSE_CATS_HOME : f.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
         <div><label style={S.lbl}>כולל מע״מ</label><select style={S.inp} value={f.includes_vat} onChange={e => set("includes_vat", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option></select></div>
-        {f.includes_vat === "כן" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
+        {f.includes_vat === "כן" && f.type === "expense" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
         <div style={S.full}><label style={S.lbl}>הערות</label><input style={S.inp} value={f.notes} onChange={e => set("notes", e.target.value)} placeholder="הערות" /></div>
       </div>
       <div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.description.trim() || !f.amount}>שמור</button></div>
@@ -274,13 +274,14 @@ function ManualTxnForm({ onSave, onClose }) {
   );
 }
 
-function RecurringForm({ onSave, onClose }) {
-  const [f, setF] = useState({ description: "", amount: "", type: "expense", domain: "", category: "", day_of_month: 1, end_date: "", income_source: "", includes_vat: "", vat_deductible: "" });
+function RecurringForm({ onSave, onClose, initial }) {
+  const isEdit = !!initial;
+  const [f, setF] = useState(initial ? { description: initial.description || "", amount: String(initial.amount || ""), type: initial.type || "expense", domain: initial.domain || "", category: initial.category || "", day_of_month: initial.day_of_month || 1, end_date: initial.end_date || "", income_source: initial.income_source || "", includes_vat: initial.includes_vat || "", vat_deductible: initial.vat_deductible || "" } : { description: "", amount: "", type: "expense", domain: "", category: "", day_of_month: 1, end_date: "", income_source: "", includes_vat: "", vat_deductible: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), is_active: true, end_date: f.end_date || null }); onClose(); };
   return (
     <Modal onClose={onClose}>
-      <div style={S.mHead}><h2 style={S.mTitle}>תנועה קבועה חדשה</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div>
+      <div style={S.mHead}><h2 style={S.mTitle}>{isEdit ? "עריכת תנועה קבועה" : "תנועה קבועה חדשה"}</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div>
       <div style={S.grid2}>
         <div style={S.full}><label style={S.lbl}>תיאור *</label><input style={S.inp} value={f.description} onChange={e => set("description", e.target.value)} placeholder="למשל: שכ״ד, ביטוח, הלוואה" /></div>
         <div><label style={S.lbl}>סוג</label><select style={S.inp} value={f.type} onChange={e => set("type", e.target.value)}><option value="expense">הוצאה</option><option value="income">הכנסה</option></select></div>
@@ -289,7 +290,7 @@ function RecurringForm({ onSave, onClose }) {
         <div><label style={S.lbl}>תחום</label><select style={S.inp} value={f.domain} onChange={e => set("domain", e.target.value)}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
         <div style={S.full}><label style={S.lbl}>קטגוריה</label><select style={S.inp} value={f.category} onChange={e => set("category", e.target.value)}><option value="">—</option>{(f.type === "income" ? INCOME_CATS : f.domain === "home" ? EXPENSE_CATS_HOME : f.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
         <div><label style={S.lbl}>כולל מע״מ</label><select style={S.inp} value={f.includes_vat} onChange={e => set("includes_vat", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option></select></div>
-        {f.includes_vat === "כן" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
+        {f.includes_vat === "כן" && f.type === "expense" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
         {f.type === "income" && <div style={S.full}><label style={S.lbl}>מקור הכנסה</label><select style={S.inp} value={f.income_source} onChange={e => set("income_source", e.target.value)}><option value="">—</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>}
         <div style={S.full}><label style={S.lbl}>תאריך סיום (אופציונלי)</label><input style={S.inp} type="date" value={f.end_date} onChange={e => set("end_date", e.target.value)} dir="ltr" /></div>
       </div>
@@ -300,37 +301,50 @@ function RecurringForm({ onSave, onClose }) {
 
 function RecurringManager({ recurring, onAdd, onUpdate, onDelete }) {
   const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("princess_recurring_collapsed") || "false"); } catch { return false; }
+  });
+  const toggleCollapse = () => { const next = !collapsed; setCollapsed(next); localStorage.setItem("princess_recurring_collapsed", JSON.stringify(next)); };
   const active = recurring.filter(r => r.is_active);
   const inactive = recurring.filter(r => !r.is_active);
   return (
     <div style={{ ...S.statCard, marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 13, fontWeight: 700 }}>🔄 תנועות קבועות ({active.length})</span>
-        <button style={{ ...S.btn1, padding: "4px 10px", fontSize: 11 }} onClick={() => setShowForm(true)}>{I.plus} חדשה</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={toggleCollapse}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>
+          <span style={{ fontSize: 11, color: "#64748B", marginLeft: 4, transition: "transform 0.2s", display: "inline-block", transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
+          🔄 תנועות קבועות ({active.length})
+        </span>
+        <button style={{ ...S.btn1, padding: "4px 10px", fontSize: 11 }} onClick={e => { e.stopPropagation(); setShowForm(true); }}>{I.plus} חדשה</button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
-        {active.map(r => (
-          <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "6px 10px", fontSize: 12 }} title={r.end_date ? `סיום: ${fmtDateFull(r.end_date)}` : ""}>
+      {!collapsed && <>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
+          {active.map(r => (
+            <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "6px 10px", fontSize: 12 }} title={r.end_date ? `סיום: ${fmtDateFull(r.end_date)}` : ""}>
+              <span style={{ flex: 1 }}>{r.description}</span>
+              <span style={{ color: r.type === "income" ? "#10B981" : "#EF4444", fontWeight: 600, direction: "ltr" }}>₪{Math.abs(r.amount).toLocaleString()}</span>
+              <span style={{ color: "#475569", fontSize: 11 }}>יום {r.day_of_month}</span>
+              {r.domain && <span style={{ fontSize: 10, color: "#64748B" }}>{DOMAINS.find(d => d.id === r.domain)?.label}</span>}
+              {r.income_source && <span style={{ fontSize: 10, color: "#3B82F6" }}>{r.income_source}</span>}
+              <button onClick={() => setEditItem(r)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.edit}</button>
+              <button onClick={() => onUpdate(r.id, { is_active: false })} style={{ ...S.iconBtn, color: "#F59E0B", fontSize: 11 }}>⏸</button>
+              <button onClick={() => { if (confirm("למחוק?")) onDelete(r.id); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
+            </div>
+          ))}
+          {active.length === 0 && <div style={{ fontSize: 12, color: "#334155", textAlign: "center", padding: 8 }}>אין תנועות קבועות</div>}
+        </div>
+        {inactive.length > 0 && <details style={{ marginTop: 6 }}><summary style={{ fontSize: 11, color: "#475569", cursor: "pointer" }}>מושהות ({inactive.length})</summary><div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>{inactive.map(r => (
+          <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "4px 10px", fontSize: 11, opacity: 0.6 }}>
             <span style={{ flex: 1 }}>{r.description}</span>
-            <span style={{ color: r.type === "income" ? "#10B981" : "#EF4444", fontWeight: 600, direction: "ltr" }}>₪{Math.abs(r.amount).toLocaleString()}</span>
-            <span style={{ color: "#475569", fontSize: 11 }}>יום {r.day_of_month}</span>
-            {r.domain && <span style={{ fontSize: 10, color: "#64748B" }}>{DOMAINS.find(d => d.id === r.domain)?.label}</span>}
-            {r.income_source && <span style={{ fontSize: 10, color: "#3B82F6" }}>{r.income_source}</span>}
-            <button onClick={() => onUpdate(r.id, { is_active: false })} style={{ ...S.iconBtn, color: "#F59E0B", fontSize: 11 }}>⏸</button>
+            <span style={{ direction: "ltr" }}>₪{Math.abs(r.amount).toLocaleString()}</span>
+            <button onClick={() => setEditItem(r)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.edit}</button>
+            <button onClick={() => onUpdate(r.id, { is_active: true })} style={{ ...S.iconBtn, color: "#10B981", fontSize: 11 }}>▶</button>
             <button onClick={() => { if (confirm("למחוק?")) onDelete(r.id); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
           </div>
-        ))}
-        {active.length === 0 && <div style={{ fontSize: 12, color: "#334155", textAlign: "center", padding: 8 }}>אין תנועות קבועות</div>}
-      </div>
-      {inactive.length > 0 && <details style={{ marginTop: 6 }}><summary style={{ fontSize: 11, color: "#475569", cursor: "pointer" }}>מושהות ({inactive.length})</summary><div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>{inactive.map(r => (
-        <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", background: "#0F172A", borderRadius: 6, padding: "4px 10px", fontSize: 11, opacity: 0.6 }}>
-          <span style={{ flex: 1 }}>{r.description}</span>
-          <span style={{ direction: "ltr" }}>₪{Math.abs(r.amount).toLocaleString()}</span>
-          <button onClick={() => onUpdate(r.id, { is_active: true })} style={{ ...S.iconBtn, color: "#10B981", fontSize: 11 }}>▶</button>
-          <button onClick={() => { if (confirm("למחוק?")) onDelete(r.id); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
-        </div>
-      ))}</div></details>}
+        ))}</div></details>}
+      </>}
       {showForm && <RecurringForm onSave={onAdd} onClose={() => setShowForm(false)} />}
+      {editItem && <RecurringForm initial={editItem} onSave={(data) => { onUpdate(editItem.id, data); setEditItem(null); }} onClose={() => setEditItem(null)} />}
     </div>
   );
 }
@@ -350,6 +364,8 @@ function CashflowView({ leads }) {
   const [showManualForm, setShowManualForm] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(null);
   const [matchConfirm, setMatchConfirm] = useState(null);
+  const [makeRecurring, setMakeRecurring] = useState(null);
+  const [editRecurringItem, setEditRecurringItem] = useState(null);
   const [hiddenMonths, setHiddenMonths] = useState(() => {
     try { return JSON.parse(localStorage.getItem("princess_hidden_months") || "[]"); } catch { return []; }
   });
@@ -451,13 +467,25 @@ function CashflowView({ leads }) {
     manualTxns.filter(m => m.status !== "matched").forEach(m => {
       rows.push({ _key: "manual_" + m.id, _type: "manual", _manualId: m.id, date: m.date, description: m.description, amount: m.type === "expense" ? -Math.abs(m.amount) : Math.abs(m.amount), domain: m.domain || "", category: m.category || "", status: m.status === "planned" ? "עתידי" : m.status === "confirmed" ? "שולם/התקבל" : m.status, linked_lead_id: m.linked_lead_id || null, notes: m.notes });
     });
-    // Recurring projections (only future months not covered by bank)
-    const bankMonthDescs = new Set(txns.map(t => t.activity_date?.slice(0, 7) + "|" + t.description));
+    // Recurring projections (only future months not covered by bank/manual)
+    // Build a map of month → amounts already present (bank + manual)
+    const existingByMonth = {};
+    rows.forEach(r => {
+      const m = r.date?.slice(0, 7);
+      if (!m) return;
+      if (!existingByMonth[m]) existingByMonth[m] = [];
+      existingByMonth[m].push({ amount: r.amount, description: r.description, used: false });
+    });
     projections.forEach(p => {
-      const key = p.date.slice(0, 7) + "|" + p.description;
-      if (!bankMonthDescs.has(key)) {
-        rows.push({ _key: "rec_" + p._recurringId + "_" + p.date, _type: "recurring", _recurringId: p._recurringId, date: p.date, description: p.description, amount: p.amount, domain: p.domain, category: p.category, status: "עתידי" });
-      }
+      const projMonth = p.date.slice(0, 7);
+      const existing = existingByMonth[projMonth] || [];
+      // Check if there's a matching transaction (same direction, similar amount ±15%, or same description)
+      const matched = existing.find(e => !e.used && (
+        e.description === p.description ||
+        (Math.sign(e.amount) === Math.sign(p.amount) && Math.abs(Math.abs(e.amount) - Math.abs(p.amount)) / Math.max(Math.abs(p.amount), 1) < 0.15)
+      ));
+      if (matched) { matched.used = true; return; }
+      rows.push({ _key: "rec_" + p._recurringId + "_" + p.date, _type: "recurring", _recurringId: p._recurringId, date: p.date, description: p.description, amount: p.amount, domain: p.domain, category: p.category, income_source: p.income_source || "", status: "עתידי" });
     });
 
     // Future credit card summary lines — estimate upcoming bank debit
@@ -668,7 +696,10 @@ function CashflowView({ leads }) {
                       <td style={S.td}>{t.description}</td>
                       <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
                       <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
+                      <td style={S.td}>
+                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
+                        {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, marginTop: 3 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור הכנסה</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+                      </td>
                       <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => setEf(p => ({ ...p, category: e.target.value }))}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : ef.domain === "home" ? EXPENSE_CATS_HOME : ef.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
                       <td style={S.td}>
                         <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, marginBottom: 3 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
@@ -676,12 +707,13 @@ function CashflowView({ leads }) {
                       </td>
                       <td style={S.td}>
                         <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, marginBottom: 3 }} value={ef.status || "paid"} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                        {ef.includes_vat === "כן" && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10 }} value={ef.vat_deductible || ""} onChange={e => setEf(p => ({ ...p, vat_deductible: e.target.value }))}><option value="">מוכר למע״מ?</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select>}
+                        {ef.includes_vat === "כן" && t.amount < 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10 }} value={ef.vat_deductible || ""} onChange={e => setEf(p => ({ ...p, vat_deductible: e.target.value }))}><option value="">מוכר למע״מ?</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select>}
                       </td>
                       <td style={S.td}>
                         <div style={{ display: "flex", gap: 2 }}>
                           <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
                           {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
+                          <button onClick={() => setMakeRecurring({ description: t.description, amount: Math.abs(t.amount), type: t.amount > 0 ? "income" : "expense", day_of_month: t.date ? parseInt(t.date.split("-")[2]) : 1, domain: ef.domain || "", category: ef.category || "" })} style={{ ...S.iconBtn, color: "#8B5CF6" }} title="הפוך לקבועה">🔄</button>
                           <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
                         </div>
                       </td>
@@ -692,7 +724,7 @@ function CashflowView({ leads }) {
 
                 // Normal row
                 rows.push(
-                  <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : undefined}>
+                  <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || (t.amount > 0 ? "biz" : ""), category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : undefined}>
                     <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
                     <td style={S.td}>
                       {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
@@ -703,13 +735,17 @@ function CashflowView({ leads }) {
                     </td>
                     <td style={{ ...S.td, fontWeight: 600, color: isNonCashflow ? "#475569" : t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
                     <td style={{ ...S.td, fontSize: 11, color: t._running === null ? "#475569" : t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
-                    <td style={S.td}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}</td>
+                    <td style={S.td}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}{t.income_source && <span style={{ fontSize: 10, color: "#3B82F6", display: "block" }}>{t.income_source}</span>}</td>
                     <td style={S.td}><span style={{ fontSize: 12 }}>{t.category || ""}{t._autoCat && <span style={{ color: "#F59E0B", fontSize: 9, marginRight: 3 }} title="קטגוריה אוטומטית">⚡</span>}</span></td>
                     <td style={S.td}><span style={{ fontSize: 12 }}>{t.payment_method || ""}</span></td>
                     <td style={S.td}><span style={{ fontSize: 12, color: t.status === "בחוב" ? "#F59E0B" : t.status === "עתידי" ? "#3B82F6" : "#475569" }}>{t.status || ""}</span></td>
                     <td style={S.td}>
                       {isBank && !isNonCashflow && (t.category && !t._autoCat ? <span style={{ color: "#10B981", fontSize: 10 }}>✓</span> : <span style={{ color: "#64748B", fontSize: 10 }}>✎</span>)}
                       {isManual && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק תנועה ידנית?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>}
+                      {isRecurring && <div style={{ display: "flex", gap: 2 }}>
+                        <button onClick={() => { const r = recurring.find(x => x.id === t._recurringId); if (r) setEditRecurringItem(r); }} style={{ ...S.iconBtn, color: "#64748B" }} title="ערוך תנועה קבועה">{I.edit}</button>
+                        <button onClick={() => { if (confirm("להשהות תנועה קבועה?")) updateRecurring(t._recurringId, { is_active: false }); }} style={{ ...S.iconBtn, color: "#F59E0B" }} title="השהה">⏸</button>
+                      </div>}
                     </td>
                   </tr>
                 );
@@ -738,6 +774,8 @@ function CashflowView({ leads }) {
           </div>
         </Modal>
       )}
+      {makeRecurring && <RecurringForm initial={makeRecurring} onSave={addRecurring} onClose={() => setMakeRecurring(null)} />}
+      {editRecurringItem && <RecurringForm initial={editRecurringItem} onSave={(data) => { updateRecurring(editRecurringItem.id, data); setEditRecurringItem(null); }} onClose={() => setEditRecurringItem(null)} />}
     </div>
   );
 }
