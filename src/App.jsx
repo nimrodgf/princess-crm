@@ -354,16 +354,88 @@ function CashflowView({ leads }) {
     _showToast("✓ קושר ללקוח");
   };
 
+  // Auto-categorization: built-in business name → category map
+  const AUTO_CAT_MAP = {
+    // דלק
+    "דור אלון": "דלק", "פז ": "דלק", "סונול": "דלק", "דלק": "דלק", "ten ": "דלק", "yellow": "דלק",
+    // מזון
+    "שופרסל": "מזון", "רמי לוי": "מזון", "מגה": "מזון", "ויקטורי": "מזון", "יוחננוף": "מזון", "אושר עד": "מזון", "חצי חינם": "מזון", "סופר": "מזון", "פרש מרקט": "מזון", "טיב טעם": "מזון", "יינות ביתן": "מזון", "am:pm": "מזון",
+    // אוכל בחוץ
+    "מקדונלד": "אוכל בחוץ", "ארומה": "אוכל בחוץ", "קפה": "אוכל בחוץ", "מסעדה": "אוכל בחוץ", "פיצה": "אוכל בחוץ", "בורגר": "אוכל בחוץ", "סושי": "אוכל בחוץ", "wolt": "אוכל בחוץ", "תן ביס": "אוכל בחוץ",
+    // פארם
+    "סופר פארם": "פארם", "פארם": "פארם", "be ": "פארם",
+    // ביטוחים
+    "הראל": "ביטוחים", "מגדל": "ביטוחים", "כלל ביטוח": "ביטוחים", "הפניקס": "ביטוחים", "ביטוח": "ביטוחים", "פנסיה": "ביטוחים",
+    // תוכנות
+    "google": "תוכנות", "apple": "תוכנות", "spotify": "תוכנות", "netflix": "תוכנות", "adobe": "תוכנות", "amazon": "תוכנות", "microsoft": "תוכנות", "openai": "תוכנות", "anthropic": "תוכנות", "github": "תוכנות",
+    // תחבצ וחניונים
+    "חניון": "תחבצ וחניונים", "חניה": "תחבצ וחניונים", "רב קו": "תחבצ וחניונים", "רכבת": "תחבצ וחניונים", "אגד": "תחבצ וחניונים", "דן ": "תחבצ וחניונים",
+    // תחזוקת רכב
+    "טסט": "תחזוקת רכב", "מוסך": "תחזוקת רכב", "צמיגים": "תחזוקת רכב",
+    // כושר
+    "כושר": "כושר", "הולמס": "כושר", "gym": "כושר",
+  };
+
+  // Learn categories from previously categorized transactions
+  const learnedCats = useMemo(() => {
+    const map = {};
+    meta.forEach(m => {
+      if (m.category && m.unique_id) {
+        const txn = txns.find(t => t.unique_id === m.unique_id);
+        if (txn?.description) {
+          const desc = txn.description.trim();
+          if (!map[desc]) map[desc] = m.category;
+        }
+      }
+    });
+    return map;
+  }, [meta, txns]);
+
+  const autoCategory = (description) => {
+    if (!description) return "";
+    const desc = description.trim();
+    // First check learned categories (exact match)
+    if (learnedCats[desc]) return learnedCats[desc];
+    // Then check built-in map (partial match)
+    const lower = desc.toLowerCase();
+    for (const [key, cat] of Object.entries(AUTO_CAT_MAP)) {
+      if (lower.includes(key.toLowerCase())) return cat;
+    }
+    return "";
+  };
+
   // Build unified timeline
   const projections = useMemo(() => generateRecurringProjections(recurring), [recurring]);
   const matchedManualIds = new Set(manualTxns.filter(m => m.status === "matched").map(m => m.id));
 
+  // Detect credit card debit lines from bank (ישראכרט lump sum)
+  const isCardDebitFn = (t) => {
+    const desc = (t.description || "").toLowerCase();
+    return (t.company_id === "otsarHahayal" || !t.company_id) &&
+      (desc.includes("ישראכרט") || desc.includes("isracard") || desc.includes("כרטיס אשראי"));
+  };
+
   const unified = useMemo(() => {
     const rows = [];
-    // Bank transactions
+    // Bank & credit card transactions
     txns.forEach(t => {
       const m = getMeta(t.unique_id);
-      rows.push({ _key: "bank_" + t.unique_id, _type: "bank", _uid: t.unique_id, date: t.activity_date, description: t.description, memo: t.memo, amount: t.charged_amount, domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", linked_lead_id: m.linked_lead_id || null, income_source: m.income_source || "" });
+      const cardDebit = isCardDebitFn(t);
+      const isCard = t.company_id === "isracard";
+      const savedCat = m.category || "";
+      const autoCat = !savedCat ? autoCategory(t.description) : "";
+      rows.push({
+        _key: "bank_" + t.unique_id, _type: "bank", _uid: t.unique_id,
+        _isCardDebit: cardDebit, _isCard: isCard,
+        _isNonCashflow: isCard, // Individual card transactions are NOT cashflow
+        date: t.activity_date, description: t.description, memo: t.memo,
+        amount: t.charged_amount,
+        domain: m.domain || "", category: savedCat || autoCat,
+        _autoCat: !savedCat && autoCat ? true : false,
+        payment_method: m.payment_method || (isCard ? "אשראי" : ""),
+        status: m.status || "שולם/התקבל",
+        linked_lead_id: m.linked_lead_id || null, income_source: m.income_source || ""
+      });
     });
     // Manual transactions (not matched)
     manualTxns.filter(m => m.status !== "matched").forEach(m => {
@@ -377,15 +449,51 @@ function CashflowView({ leads }) {
         rows.push({ _key: "rec_" + p._recurringId + "_" + p.date, _type: "recurring", _recurringId: p._recurringId, date: p.date, description: p.description, amount: p.amount, domain: p.domain, category: p.category, status: "עתידי" });
       }
     });
+
+    // Future credit card summary lines — estimate upcoming bank debit
+    const now = new Date();
+    const cardByMonth = {};
+    txns.filter(t => t.company_id === "isracard").forEach(t => {
+      const raw = typeof t.raw === "string" ? JSON.parse(t.raw || "{}") : (t.raw || {});
+      const chargeMonth = (raw.processedDate || t.activity_date || "").slice(0, 7);
+      if (!chargeMonth) return;
+      if (!cardByMonth[chargeMonth]) cardByMonth[chargeMonth] = 0;
+      cardByMonth[chargeMonth] += Math.abs(t.charged_amount);
+    });
+    // Only show for future months where bank hasn't debited yet
+    const bankCardDebits = new Set(txns.filter(t => isCardDebitFn(t)).map(t => t.activity_date?.slice(0, 7)));
+    Object.entries(cardByMonth).forEach(([mon, total]) => {
+      if (!bankCardDebits.has(mon)) {
+        rows.push({
+          _key: "card_summary_" + mon, _type: "card_summary",
+          _isCardSummary: true,
+          date: mon + "-01",
+          description: `💳 חיוב אשראי צפוי — ${new Date(mon + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}`,
+          amount: -total, // This DOES affect cashflow — it's the expected bank debit
+          _cardTotal: total,
+          domain: "", category: "הורדת אשראי", status: "עתידי"
+        });
+      }
+    });
+
+    // Sort ascending for running total calc
     rows.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-    // Calc running total with opening balance
-    // openingBalance = currentBalance - sum of all bank transactions
-    const bankSum = rows.filter(r => r._type === "bank").reduce((s, r) => s + r.amount, 0);
-    const openingBalance = currentBalance !== null ? currentBalance - bankSum : 0;
+    // Calc running total — individual card txns excluded, card debit + card summary included
+    const bankOnlySum = rows.filter(r => !r._isNonCashflow && (r._type === "bank" || r._type === "manual" || r._type === "card_summary")).reduce((s, r) => s + r.amount, 0);
+    const openingBalance = currentBalance !== null ? currentBalance - bankOnlySum : 0;
     let running = openingBalance;
-    rows.forEach(r => { running += r.amount; r._running = running; });
+    rows.forEach(r => {
+      if (r._isNonCashflow) {
+        r._running = null; // Individual card transactions — no running total
+      } else {
+        running += r.amount;
+        r._running = running;
+      }
+    });
+    // Reverse — newest first
+    rows.reverse();
     return rows;
-  }, [txns, meta, manualTxns, projections, currentBalance]);
+  }, [txns, meta, manualTxns, projections, currentBalance, learnedCats]);
 
   const months = [...new Set(unified.map(t => t.date?.slice(0, 7)).filter(Boolean))].sort().reverse();
 
@@ -398,8 +506,8 @@ function CashflowView({ leads }) {
     return true;
   });
 
-  const totalIncome = filtered.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const totalExpense = filtered.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalIncome = filtered.filter(t => t.amount > 0 && !t._isNonCashflow).reduce((s, t) => s + t.amount, 0);
+  const totalExpense = filtered.filter(t => t.amount < 0 && !t._isNonCashflow).reduce((s, t) => s + Math.abs(t.amount), 0);
   const balance = totalIncome - totalExpense;
 
   // Potential matches for confirmation
@@ -485,17 +593,35 @@ function CashflowView({ leads }) {
               const isBank = t._type === "bank";
               const isManual = t._type === "manual";
               const isRecurring = t._type === "recurring";
+              const isCardSummary = t._isCardSummary;
+              const isCard = t._isCard;
+              const isNonCashflow = t._isNonCashflow;
               const isEd = editId === t._key;
               const linkedLead = t.linked_lead_id ? leads.find(l => l.id === t.linked_lead_id) : null;
-              const rowBg = isRecurring ? "#0B112080" : isManual ? "#1E293B10" : undefined;
-              const typeIndicator = isRecurring ? "🔄" : isManual ? "✏️" : "";
+              const rowBg = isNonCashflow ? "#1E293B08" : isCardSummary ? "#F59E0B10" : isRecurring ? "#0B112080" : isManual ? "#1E293B10" : undefined;
+              const typeIndicator = isCardSummary ? "💳" : isCard ? "💳" : isRecurring ? "🔄" : isManual ? "✏️" : "";
+
+              // Card summary row — future expected bank debit
+              if (isCardSummary) return (
+                <tr key={t._key} style={{ background: rowBg }}>
+                  <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
+                  <td style={{ ...S.td, fontWeight: 600 }}>{typeIndicator} {t.description}</td>
+                  <td style={{ ...S.td, fontWeight: 600, color: "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._cardTotal.toLocaleString()}</td>
+                  <td style={{ ...S.td, fontSize: 11, color: t._running !== null && t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
+                  <td style={S.td}></td>
+                  <td style={S.td}><span style={{ fontSize: 12 }}>הורדת אשראי</span></td>
+                  <td style={S.td}></td>
+                  <td style={S.td}><span style={{ fontSize: 12, color: "#3B82F6" }}>עתידי</span></td>
+                  <td style={S.td}></td>
+                </tr>
+              );
 
               if (isEd && isBank) return (
                 <tr key={t._key}>
                   <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
                   <td style={S.td}>{t.description}</td>
                   <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
-                  <td style={{ ...S.td, fontSize: 11, color: t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._running.toLocaleString()}</td>
+                  <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
                   <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
                   <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => setEf(p => ({ ...p, category: e.target.value }))}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : ef.domain === "home" ? EXPENSE_CATS_HOME : ef.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
                   <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">—</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></td>
@@ -511,22 +637,23 @@ function CashflowView({ leads }) {
               );
 
               return (
-                <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "" }); } : undefined}>
+                <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.45 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "" }); } : undefined}>
                   <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
                   <td style={S.td}>
                     {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
                     {t.description}
                     {t.memo && <span style={{ color: "#475569", fontSize: 11, marginRight: 6 }}> ({t.memo})</span>}
                     {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11, marginRight: 6 }}> ← {linkedLead.name}</span>}
+                    {isNonCashflow && <span style={{ color: "#64748B", fontSize: 10, marginRight: 6 }}> (פירוט)</span>}
                   </td>
-                  <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
-                  <td style={{ ...S.td, fontSize: 11, color: t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._running.toLocaleString()}</td>
+                  <td style={{ ...S.td, fontWeight: 600, color: isNonCashflow ? "#475569" : t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
+                  <td style={{ ...S.td, fontSize: 11, color: t._running === null ? "#475569" : t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
                   <td style={S.td}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}</td>
-                  <td style={S.td}><span style={{ fontSize: 12 }}>{t.category || ""}</span></td>
+                  <td style={S.td}><span style={{ fontSize: 12 }}>{t.category || ""}{t._autoCat && <span style={{ color: "#F59E0B", fontSize: 9, marginRight: 3 }} title="קטגוריה אוטומטית">⚡</span>}</span></td>
                   <td style={S.td}><span style={{ fontSize: 12 }}>{t.payment_method || ""}</span></td>
                   <td style={S.td}><span style={{ fontSize: 12, color: t.status === "בחוב" ? "#F59E0B" : t.status === "עתידי" ? "#3B82F6" : "#475569" }}>{t.status || ""}</span></td>
                   <td style={S.td}>
-                    {isBank && (t.category ? <span style={{ color: "#10B981", fontSize: 10 }}>✓</span> : <span style={{ color: "#64748B", fontSize: 10 }}>✎</span>)}
+                    {isBank && !isNonCashflow && (t.category && !t._autoCat ? <span style={{ color: "#10B981", fontSize: 10 }}>✓</span> : <span style={{ color: "#64748B", fontSize: 10 }}>✎</span>)}
                     {isManual && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק תנועה ידנית?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>}
                   </td>
                 </tr>
