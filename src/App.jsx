@@ -303,6 +303,16 @@ function CashflowView({ leads }) {
   const [showManualForm, setShowManualForm] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(null);
   const [matchConfirm, setMatchConfirm] = useState(null);
+  const [hiddenMonths, setHiddenMonths] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("princess_hidden_months") || "[]"); } catch { return []; }
+  });
+  const toggleMonth = (m) => {
+    setHiddenMonths(prev => {
+      const next = prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m];
+      localStorage.setItem("princess_hidden_months", JSON.stringify(next));
+      return next;
+    });
+  };
   const [currentBalance, setCurrentBalance] = useState(() => {
     const saved = localStorage.getItem("princess_current_balance");
     return saved ? Number(saved) : null;
@@ -490,8 +500,6 @@ function CashflowView({ leads }) {
         r._running = running;
       }
     });
-    // Reverse — newest first
-    rows.reverse();
     return rows;
   }, [txns, meta, manualTxns, projections, currentBalance, learnedCats]);
 
@@ -589,76 +597,119 @@ function CashflowView({ leads }) {
             <th style={S.th}></th>
           </tr></thead>
           <tbody>
-            {filtered.map((t, i) => {
-              const isBank = t._type === "bank";
-              const isManual = t._type === "manual";
-              const isRecurring = t._type === "recurring";
-              const isCardSummary = t._isCardSummary;
-              const isCard = t._isCard;
-              const isNonCashflow = t._isNonCashflow;
-              const isEd = editId === t._key;
-              const linkedLead = t.linked_lead_id ? leads.find(l => l.id === t.linked_lead_id) : null;
-              const rowBg = isNonCashflow ? "#1E293B08" : isCardSummary ? "#F59E0B10" : isRecurring ? "#0B112080" : isManual ? "#1E293B10" : undefined;
-              const typeIndicator = isCardSummary ? "💳" : isCard ? "💳" : isRecurring ? "🔄" : isManual ? "✏️" : "";
+            {(() => {
+              const seenMonths = new Set();
+              return filtered.flatMap((t, i) => {
+                const rowMonth = t.date?.slice(0, 7) || "";
+                const isFirstOfMonth = rowMonth && !seenMonths.has(rowMonth);
+                if (rowMonth) seenMonths.add(rowMonth);
+                const isHidden = hiddenMonths.includes(rowMonth);
+                const rows = [];
 
-              // Card summary row — future expected bank debit
-              if (isCardSummary) return (
-                <tr key={t._key} style={{ background: rowBg }}>
-                  <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
-                  <td style={{ ...S.td, fontWeight: 600 }}>{typeIndicator} {t.description}</td>
-                  <td style={{ ...S.td, fontWeight: 600, color: "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._cardTotal.toLocaleString()}</td>
-                  <td style={{ ...S.td, fontSize: 11, color: t._running !== null && t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
-                  <td style={S.td}></td>
-                  <td style={S.td}><span style={{ fontSize: 12 }}>הורדת אשראי</span></td>
-                  <td style={S.td}></td>
-                  <td style={S.td}><span style={{ fontSize: 12, color: "#3B82F6" }}>עתידי</span></td>
-                  <td style={S.td}></td>
-                </tr>
-              );
+                // Month header row
+                if (isFirstOfMonth && !month) {
+                  const monthLabel = new Date(rowMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+                  const monthTxns = filtered.filter(x => x.date?.startsWith(rowMonth) && !x._isNonCashflow);
+                  const mIncome = monthTxns.filter(x => x.amount > 0).reduce((s, x) => s + x.amount, 0);
+                  const mExpense = monthTxns.filter(x => x.amount < 0).reduce((s, x) => s + Math.abs(x.amount), 0);
+                  rows.push(
+                    <tr key={"month_" + rowMonth} style={{ background: "#111827", cursor: "pointer" }} onClick={() => toggleMonth(rowMonth)}>
+                      <td colSpan={9} style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, borderBottom: "2px solid #1E293B" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 11, color: "#64748B", transition: "transform 0.2s", transform: isHidden ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
+                          <span>{monthLabel}</span>
+                          <span style={{ flex: 1 }} />
+                          <span style={{ fontSize: 11, color: "#10B981", fontWeight: 600 }}>+₪{mIncome.toLocaleString()}</span>
+                          <span style={{ fontSize: 11, color: "#EF4444", fontWeight: 600 }}>-₪{mExpense.toLocaleString()}</span>
+                          <span style={{ fontSize: 11, color: mIncome - mExpense >= 0 ? "#10B981" : "#EF4444", fontWeight: 600 }}>= ₪{(mIncome - mExpense).toLocaleString()}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
 
-              if (isEd && isBank) return (
-                <tr key={t._key}>
-                  <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
-                  <td style={S.td}>{t.description}</td>
-                  <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
-                  <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
-                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
-                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => setEf(p => ({ ...p, category: e.target.value }))}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : ef.domain === "home" ? EXPENSE_CATS_HOME : ef.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
-                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">—</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></td>
-                  <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.status || "paid"} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
-                  <td style={S.td}>
-                    <div style={{ display: "flex", gap: 2 }}>
-                      <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
-                      {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
-                      <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
-                    </div>
-                  </td>
-                </tr>
-              );
+                // Skip rows of hidden months
+                if (isHidden && !month) return rows;
 
-              return (
-                <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.45 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "" }); } : undefined}>
-                  <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
-                  <td style={S.td}>
-                    {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
-                    {t.description}
-                    {t.memo && <span style={{ color: "#475569", fontSize: 11, marginRight: 6 }}> ({t.memo})</span>}
-                    {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11, marginRight: 6 }}> ← {linkedLead.name}</span>}
-                    {isNonCashflow && <span style={{ color: "#64748B", fontSize: 10, marginRight: 6 }}> (פירוט)</span>}
-                  </td>
-                  <td style={{ ...S.td, fontWeight: 600, color: isNonCashflow ? "#475569" : t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
-                  <td style={{ ...S.td, fontSize: 11, color: t._running === null ? "#475569" : t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
-                  <td style={S.td}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}</td>
-                  <td style={S.td}><span style={{ fontSize: 12 }}>{t.category || ""}{t._autoCat && <span style={{ color: "#F59E0B", fontSize: 9, marginRight: 3 }} title="קטגוריה אוטומטית">⚡</span>}</span></td>
-                  <td style={S.td}><span style={{ fontSize: 12 }}>{t.payment_method || ""}</span></td>
-                  <td style={S.td}><span style={{ fontSize: 12, color: t.status === "בחוב" ? "#F59E0B" : t.status === "עתידי" ? "#3B82F6" : "#475569" }}>{t.status || ""}</span></td>
-                  <td style={S.td}>
-                    {isBank && !isNonCashflow && (t.category && !t._autoCat ? <span style={{ color: "#10B981", fontSize: 10 }}>✓</span> : <span style={{ color: "#64748B", fontSize: 10 }}>✎</span>)}
-                    {isManual && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק תנועה ידנית?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>}
-                  </td>
-                </tr>
-              );
-            })}
+                const isBank = t._type === "bank";
+                const isManual = t._type === "manual";
+                const isRecurring = t._type === "recurring";
+                const isCardSummary = t._isCardSummary;
+                const isCard = t._isCard;
+                const isNonCashflow = t._isNonCashflow;
+                const isEd = editId === t._key;
+                const linkedLead = t.linked_lead_id ? leads.find(l => l.id === t.linked_lead_id) : null;
+                const rowBg = isNonCashflow ? "#1E293B08" : isCardSummary ? "#F59E0B10" : isRecurring ? "#0B112080" : isManual ? "#1E293B10" : undefined;
+                const typeIndicator = isCardSummary ? "💳" : isCard ? "💳" : isRecurring ? "🔄" : isManual ? "✏️" : "";
+
+                // Card summary row
+                if (isCardSummary) {
+                  rows.push(
+                    <tr key={t._key} style={{ background: rowBg }}>
+                      <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
+                      <td style={{ ...S.td, fontWeight: 600 }}>{typeIndicator} {t.description}</td>
+                      <td style={{ ...S.td, fontWeight: 600, color: "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._cardTotal.toLocaleString()}</td>
+                      <td style={{ ...S.td, fontSize: 11, color: t._running !== null && t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
+                      <td style={S.td}></td>
+                      <td style={S.td}><span style={{ fontSize: 12 }}>הורדת אשראי</span></td>
+                      <td style={S.td}></td>
+                      <td style={S.td}><span style={{ fontSize: 12, color: "#3B82F6" }}>עתידי</span></td>
+                      <td style={S.td}></td>
+                    </tr>
+                  );
+                  return rows;
+                }
+
+                // Edit mode
+                if (isEd && isBank) {
+                  rows.push(
+                    <tr key={t._key}>
+                      <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
+                      <td style={S.td}>{t.description}</td>
+                      <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
+                      <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
+                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></td>
+                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => setEf(p => ({ ...p, category: e.target.value }))}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : ef.domain === "home" ? EXPENSE_CATS_HOME : ef.domain === "biz" ? EXPENSE_CATS_BIZ : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">—</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></td>
+                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.status || "paid"} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                      <td style={S.td}>
+                        <div style={{ display: "flex", gap: 2 }}>
+                          <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                          {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
+                          <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                  return rows;
+                }
+
+                // Normal row
+                rows.push(
+                  <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || "", category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "" }); } : undefined}>
+                    <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
+                    <td style={S.td}>
+                      {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
+                      {t.description}
+                      {t.memo && <span style={{ color: "#475569", fontSize: 11, marginRight: 6 }}> ({t.memo})</span>}
+                      {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11, marginRight: 6 }}> ← {linkedLead.name}</span>}
+                      {isNonCashflow && <span style={{ color: "#64748B", fontSize: 10, marginRight: 6 }}> (פירוט)</span>}
+                    </td>
+                    <td style={{ ...S.td, fontWeight: 600, color: isNonCashflow ? "#475569" : t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
+                    <td style={{ ...S.td, fontSize: 11, color: t._running === null ? "#475569" : t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
+                    <td style={S.td}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}</td>
+                    <td style={S.td}><span style={{ fontSize: 12 }}>{t.category || ""}{t._autoCat && <span style={{ color: "#F59E0B", fontSize: 9, marginRight: 3 }} title="קטגוריה אוטומטית">⚡</span>}</span></td>
+                    <td style={S.td}><span style={{ fontSize: 12 }}>{t.payment_method || ""}</span></td>
+                    <td style={S.td}><span style={{ fontSize: 12, color: t.status === "בחוב" ? "#F59E0B" : t.status === "עתידי" ? "#3B82F6" : "#475569" }}>{t.status || ""}</span></td>
+                    <td style={S.td}>
+                      {isBank && !isNonCashflow && (t.category && !t._autoCat ? <span style={{ color: "#10B981", fontSize: 10 }}>✓</span> : <span style={{ color: "#64748B", fontSize: 10 }}>✎</span>)}
+                      {isManual && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק תנועה ידנית?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>}
+                    </td>
+                  </tr>
+                );
+                return rows;
+              });
+            })()}
           </tbody>
         </table>
       </div>
