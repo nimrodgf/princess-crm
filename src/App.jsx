@@ -189,20 +189,24 @@ function generateRecurringProjections(recurring) {
   for (const r of recurring) {
     if (!r.is_active) continue;
     const endDate = r.end_date ? new Date(r.end_date) : defaultEnd;
+    const skips = (r.skip_months || "").split(",").map(s => s.trim()).filter(Boolean);
     let d = new Date(now.getFullYear(), now.getMonth(), r.day_of_month || 1);
     if (d < now) d.setMonth(d.getMonth() + 1);
     while (d <= endDate) {
-      projections.push({
-        _type: "recurring",
-        _recurringId: r.id,
-        date: d.toISOString().slice(0, 10),
-        description: r.description,
-        amount: r.type === "expense" ? -Math.abs(r.amount) : Math.abs(r.amount),
-        domain: r.domain || "",
-        category: r.category || "",
-        income_source: r.income_source || "",
-        status: "עתידי",
-      });
+      const monthKey = d.toISOString().slice(0, 7);
+      if (!skips.includes(monthKey)) {
+        projections.push({
+          _type: "recurring",
+          _recurringId: r.id,
+          date: d.toISOString().slice(0, 10),
+          description: r.description,
+          amount: r.type === "expense" ? -Math.abs(r.amount) : Math.abs(r.amount),
+          domain: r.domain || "",
+          category: r.category || "",
+          income_source: r.income_source || "",
+          status: "עתידי",
+        });
+      }
       d = new Date(d);
       d.setMonth(d.getMonth() + 1);
     }
@@ -366,6 +370,7 @@ function CashflowView({ leads }) {
   const [matchConfirm, setMatchConfirm] = useState(null);
   const [makeRecurring, setMakeRecurring] = useState(null);
   const [editRecurringItem, setEditRecurringItem] = useState(null);
+  const [recurringAction, setRecurringAction] = useState(null);
   const [hiddenMonths, setHiddenMonths] = useState(() => {
     try { return JSON.parse(localStorage.getItem("princess_hidden_months") || "[]"); } catch { return []; }
   });
@@ -744,7 +749,7 @@ function CashflowView({ leads }) {
                       {isManual && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק תנועה ידנית?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>}
                       {isRecurring && <div style={{ display: "flex", gap: 2 }}>
                         <button onClick={() => { const r = recurring.find(x => x.id === t._recurringId); if (r) setEditRecurringItem(r); }} style={{ ...S.iconBtn, color: "#64748B" }} title="ערוך תנועה קבועה">{I.edit}</button>
-                        <button onClick={() => { if (confirm("להשהות תנועה קבועה?")) updateRecurring(t._recurringId, { is_active: false }); }} style={{ ...S.iconBtn, color: "#F59E0B" }} title="השהה">⏸</button>
+                        <button onClick={() => setRecurringAction({ recurringId: t._recurringId, month: t.date?.slice(0, 7), description: t.description })} style={{ ...S.iconBtn, color: "#F59E0B" }} title="דלג/השהה/מחק">⏸</button>
                       </div>}
                     </td>
                   </tr>
@@ -776,6 +781,35 @@ function CashflowView({ leads }) {
       )}
       {makeRecurring && <RecurringForm initial={makeRecurring} onSave={addRecurring} onClose={() => setMakeRecurring(null)} />}
       {editRecurringItem && <RecurringForm initial={editRecurringItem} onSave={(data) => { updateRecurring(editRecurringItem.id, data); setEditRecurringItem(null); }} onClose={() => setEditRecurringItem(null)} />}
+      {recurringAction && (
+        <Modal onClose={() => setRecurringAction(null)}>
+          <div style={S.mHead}><h2 style={S.mTitle}>מחיקת תנועה קבועה</h2><button style={S.iconBtn} onClick={() => setRecurringAction(null)}>{I.x}</button></div>
+          <p style={{ fontSize: 13, marginBottom: 12 }}>{recurringAction.description}</p>
+          <p style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>מה תרצה לעשות?</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button style={{ ...S.btn1, textAlign: "right", padding: "10px 14px" }} onClick={() => {
+              const r = recurring.find(x => x.id === recurringAction.recurringId);
+              if (r) {
+                const existing = (r.skip_months || "").split(",").map(s => s.trim()).filter(Boolean);
+                existing.push(recurringAction.month);
+                updateRecurring(r.id, { skip_months: existing.join(",") });
+              }
+              _showToast("✓ חודש זה הוסר");
+              setRecurringAction(null);
+            }}>🗓 רק החודש הזה ({new Date(recurringAction.month + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })})</button>
+            <button style={{ ...S.btn2, textAlign: "right", padding: "10px 14px" }} onClick={() => {
+              updateRecurring(recurringAction.recurringId, { is_active: false });
+              _showToast("✓ תנועה קבועה הושהתה");
+              setRecurringAction(null);
+            }}>⏸ השהה את כל התנועות העתידיות</button>
+            <button style={{ ...S.btn2, textAlign: "right", padding: "10px 14px", color: "#EF4444" }} onClick={() => {
+              if (confirm("למחוק לצמיתות?")) { deleteRecurring(recurringAction.recurringId); _showToast("✓ נמחק"); }
+              setRecurringAction(null);
+            }}>🗑 מחק לצמיתות</button>
+          </div>
+          <div style={S.mFoot}><button style={S.btn2} onClick={() => setRecurringAction(null)}>ביטול</button></div>
+        </Modal>
+      )}
     </div>
   );
 }
