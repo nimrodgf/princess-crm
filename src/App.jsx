@@ -523,11 +523,13 @@ function CashflowView({ leads }) {
   const autoPayMethod = (desc, companyId) => {
     if (companyId === "isracard") return "אשראי";
     const d = (desc || "").toLowerCase();
-    if (d.includes("העברה מהחשבון") || d.includes("העברת שכר") || d.includes("זיכוי מב.") || d.includes("זיכוי מבל") || d.includes("זיכוי מבנק") || d.includes("זיכוי מדיסקונט")) return "העברה";
     if (d.includes("ביט") || d.includes("bit") || d.includes("מביט")) return "ביט";
-    if (d.includes("הוראת קבע") || d.includes("הוראות ק")) return "הוראת קבע";
     if (d.includes("paybox") || d.includes("פייבוקס") || d.includes("מפייבוקס")) return "פייבוקס";
+    if (d.includes("הוראת קבע") || d.includes("הוראות ק")) return "הוראת קבע";
     if (d.includes("כספונט") || d.includes("מזומן") || d.includes("הפקדת מזומן")) return "מזומן";
+    if (d.includes("העברה") || d.includes("העברת") || d.includes("זיכוי")) return "העברה";
+    // All remaining otsarHahayal transactions that aren't loans/fees
+    if (companyId === "otsarHahayal") return "העברה";
     return "";
   };
 
