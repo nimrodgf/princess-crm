@@ -436,6 +436,7 @@ function CashflowView({ leads }) {
   const [typeF, setTypeF] = useState("");
   const [domainF, setDomainF] = useState("");
   const [catF, setCatF] = useState("");
+  const [payF, setPayF] = useState("");
   const [editId, setEditId] = useState(null);
   const [ef, setEf] = useState({});
   const [showManualForm, setShowManualForm] = useState(false);
@@ -519,6 +520,17 @@ function CashflowView({ leads }) {
       (desc.includes("ישראכרט") || desc.includes("isracard") || desc.includes("כרטיס אשראי"));
   };
 
+  const autoPayMethod = (desc, companyId) => {
+    if (companyId === "isracard") return "אשראי";
+    const d = (desc || "").toLowerCase();
+    if (d.includes("העברה מהחשבון") || d.includes("העברת שכר") || d.includes("זיכוי מב.") || d.includes("זיכוי מבל") || d.includes("זיכוי מבנק") || d.includes("זיכוי מדיסקונט")) return "העברה";
+    if (d.includes("ביט") || d.includes("bit") || d.includes("מביט")) return "ביט";
+    if (d.includes("הוראת קבע") || d.includes("הוראות ק")) return "הוראת קבע";
+    if (d.includes("paybox") || d.includes("פייבוקס") || d.includes("מפייבוקס")) return "פייבוקס";
+    if (d.includes("כספונט") || d.includes("מזומן") || d.includes("הפקדת מזומן")) return "מזומן";
+    return "";
+  };
+
   const unified = useMemo(() => {
     const rows = [];
     // Bank & credit card transactions
@@ -541,7 +553,7 @@ function CashflowView({ leads }) {
         _autoCat: !savedCat && autoCat ? true : false,
         includes_vat: m.includes_vat || (catDef ? catDef.includes_vat : ""),
         vat_deductible: m.vat_deductible || (catDef ? catDef.vat_deductible : ""),
-        payment_method: m.payment_method || (isCard ? "אשראי" : ""),
+        payment_method: m.payment_method || autoPayMethod(t.description, t.company_id),
         status: m.status || "שולם/התקבל",
         linked_lead_id: m.linked_lead_id || null, income_source: m.income_source || ""
       });
@@ -627,6 +639,7 @@ function CashflowView({ leads }) {
     if (domainF && t.domain !== domainF) return false;
     if (catF === "__none__" && t.category) return false;
     if (catF && catF !== "__none__" && t.category !== catF) return false;
+    if (payF && t.payment_method !== payF) return false;
     return true;
   });
 
@@ -709,6 +722,7 @@ function CashflowView({ leads }) {
         <button style={typeF === "expense" ? { ...S.filterOn, background: "#EF4444" } : S.filterOff} onClick={() => setTypeF(typeF === "expense" ? "" : "expense")}>הוצאות</button>
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: domainF ? "#F59E0B" : "#1E293B", color: domainF ? "#fff" : "#64748B", border: "none" }} value={domainF} onChange={e => setDomainF(e.target.value)}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: catF ? "#8B5CF6" : "#1E293B", color: catF ? "#fff" : "#64748B", border: "none" }} value={catF} onChange={e => setCatF(e.target.value)}><option value="">קטגוריה</option><option value="__none__">⚠ ללא קטגוריה</option>{ALL_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: payF ? "#06B6D4" : "#1E293B", color: payF ? "#fff" : "#64748B", border: "none" }} value={payF} onChange={e => setPayF(e.target.value)}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
         <div style={{ flex: 1 }} />
         <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
       </div>
