@@ -8,7 +8,7 @@ async function sb(table, method = "GET", body = null, query = "") { const res = 
 async function sbMoneyman(query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { headers: { ...hdrs, "Accept-Profile": "moneyman" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
 async function addToCalendar(title, start, desc = "") { try { const r = await fetch(GCAL_URL, { method: "POST", body: JSON.stringify({ title, start, description: desc, duration: 30 }) }); return (await r.json()).success; } catch { return false; } }
 
-const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
+const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "frozen", label: "בהקפאה", color: "#64748B", bg: "#64748B15" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
 const BOARD_STATUSES = STATUSES.filter(s => s.id !== "new");
 const SERVICES = ["הקלטה", "מיקס", "הפקה", "הפקה - אפיק", "לייב סשן", "פודקאסט", "צילום קורס", "השכרת חלל", "בית ריק", "ייעוץ אומנותי - נימשי", "ייעוץ אומנותי - אפיק", "אחר"];
 const SOURCES = ["אינסטגרם", "המלצה", "גוגל", "פייסבוק", "אתר", "שיווק אקטיבי", "ממומן - מטא", "הכירות קודמת", "חוזר/ת", "אחר"];
@@ -437,6 +437,7 @@ function CashflowView({ leads }) {
   const [domainF, setDomainF] = useState("");
   const [catF, setCatF] = useState("");
   const [payF, setPayF] = useState("");
+  const [incSrcF, setIncSrcF] = useState("");
   const [editId, setEditId] = useState(null);
   const [ef, setEf] = useState({});
   const [showManualForm, setShowManualForm] = useState(false);
@@ -642,6 +643,9 @@ function CashflowView({ leads }) {
     if (catF === "__none__" && t.category) return false;
     if (catF && catF !== "__none__" && t.category !== catF) return false;
     if (payF && t.payment_method !== payF) return false;
+    if (incSrcF === "__none__" && t.income_source) return false;
+    if (incSrcF === "__none__" && t.amount <= 0) return false;
+    if (incSrcF && incSrcF !== "__none__" && t.income_source !== incSrcF) return false;
     return true;
   });
 
@@ -725,6 +729,7 @@ function CashflowView({ leads }) {
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: domainF ? "#F59E0B" : "#1E293B", color: domainF ? "#fff" : "#64748B", border: "none" }} value={domainF} onChange={e => setDomainF(e.target.value)}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: catF ? "#8B5CF6" : "#1E293B", color: catF ? "#fff" : "#64748B", border: "none" }} value={catF} onChange={e => setCatF(e.target.value)}><option value="">קטגוריה</option><option value="__none__">⚠ ללא קטגוריה</option>{ALL_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: payF ? "#06B6D4" : "#1E293B", color: payF ? "#fff" : "#64748B", border: "none" }} value={payF} onChange={e => setPayF(e.target.value)}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: incSrcF ? "#10B981" : "#1E293B", color: incSrcF ? "#fff" : "#64748B", border: "none" }} value={incSrcF} onChange={e => setIncSrcF(e.target.value)}><option value="">מקור הכנסה</option><option value="__none__">⚠ ללא מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>
         <div style={{ flex: 1 }} />
         <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
       </div>
@@ -977,7 +982,7 @@ function DashboardView() {
     return true;
   });
 
-  // Monthly breakdown
+  // Monthly breakdown (exclude credit card debit lines to avoid double counting)
   const monthlyData = useMemo(() => {
     const months = {};
     for (let m = 1; m <= 12; m++) {
@@ -987,30 +992,70 @@ function DashboardView() {
     yearTxns.forEach(t => {
       const key = t.activity_date?.slice(0, 7);
       if (!key || !months[key]) return;
+      // Skip credit card debit lines and non-cashflow categories
+      if (EXCLUDE_EXPENSE_CATS.has(t.category)) return;
+      if (t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט")) return;
       if (t.charged_amount > 0) months[key].income += t.charged_amount;
       else months[key].expense += Math.abs(t.charged_amount);
     });
     return Object.entries(months).map(([k, v]) => ({ month: k, ...v }));
   }, [yearTxns, year]);
 
-  // Category breakdown for expenses
+  // Categories to exclude from expense charts (non-real-expenses)
+  const EXCLUDE_EXPENSE_CATS = new Set(["הורדת אשראי", "לא תזרימי"]);
   const EXPENSE_ONLY_CATS = new Set([...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]);
   const INCOME_ONLY_CATS = new Set(INCOME_CATS);
+  const HOME_CATS = new Set(EXPENSE_CATS_HOME);
+  const BIZ_CATS = new Set(EXPENSE_CATS_BIZ);
 
-  const expenseByCat = useMemo(() => {
+  // Filter out credit card debit lines from bank (to avoid double counting)
+  const realExpenseTxns = yearTxns.filter(t =>
+    t.charged_amount < 0 &&
+    !INCOME_ONLY_CATS.has(t.category) &&
+    !EXCLUDE_EXPENSE_CATS.has(t.category) &&
+    !(t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט"))
+  );
+
+  // Home expenses
+  const expenseHome = useMemo(() => {
     const cats = {};
-    yearTxns.filter(t => t.charged_amount < 0 && !INCOME_ONLY_CATS.has(t.category)).forEach(t => {
+    realExpenseTxns.filter(t => t.domain === "home" || HOME_CATS.has(t.category)).forEach(t => {
       const c = t.category || "ללא קטגוריה";
       cats[c] = (cats[c] || 0) + Math.abs(t.charged_amount);
     });
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  }, [yearTxns]);
+  }, [realExpenseTxns]);
 
-  // Category breakdown for income — use income_source first, then category (skip expense cats)
+  // Business expenses
+  const expenseBiz = useMemo(() => {
+    const cats = {};
+    realExpenseTxns.filter(t => t.domain === "biz" || BIZ_CATS.has(t.category)).forEach(t => {
+      const c = t.category || "ללא קטגוריה";
+      cats[c] = (cats[c] || 0) + Math.abs(t.charged_amount);
+    });
+    return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [realExpenseTxns]);
+
+  // All expenses (for totals)
+  const expenseByCat = useMemo(() => {
+    const cats = {};
+    realExpenseTxns.forEach(t => {
+      const c = t.category || "ללא קטגוריה";
+      cats[c] = (cats[c] || 0) + Math.abs(t.charged_amount);
+    });
+    return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [realExpenseTxns]);
+
+  // Income — use income_source, fallback to meaningful label
   const incomeByCat = useMemo(() => {
     const cats = {};
     yearTxns.filter(t => t.charged_amount > 0).forEach(t => {
-      const label = t.income_source || (EXPENSE_ONLY_CATS.has(t.category) ? "אחר" : t.category) || "ללא קטגוריה";
+      let label = t.income_source;
+      if (!label) {
+        if (INCOME_ONLY_CATS.has(t.category)) label = "ללא מקור";
+        else if (EXPENSE_ONLY_CATS.has(t.category)) label = "אחר";
+        else label = t.category || "ללא קטגוריה";
+      }
       cats[label] = (cats[label] || 0) + t.charged_amount;
     });
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -1019,6 +1064,8 @@ function DashboardView() {
   const PIE_COLORS = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#06B6D4", "#EC4899", "#F97316", "#84CC16", "#6366F1"];
 
   const totalExpense = expenseByCat.reduce((s, [, v]) => s + v, 0);
+  const totalExpenseHome = expenseHome.reduce((s, [, v]) => s + v, 0);
+  const totalExpenseBiz = expenseBiz.reduce((s, [, v]) => s + v, 0);
   const totalIncome = incomeByCat.reduce((s, [, v]) => s + v, 0);
 
   // VAT calculation
@@ -1155,8 +1202,11 @@ function DashboardView() {
 
       {/* Pie charts */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-        <PieChart data={expenseByCat} total={totalExpense} title="פילוג הוצאות לפי קטגוריה" />
-        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות" />
+        <PieChart data={expenseHome} total={totalExpenseHome} title="הוצאות בית" />
+        <PieChart data={expenseBiz} total={totalExpenseBiz} title="הוצאות עסק" />
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות לפי מקור" />
       </div>
 
       {/* VAT summary */}
