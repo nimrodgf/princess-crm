@@ -505,7 +505,7 @@ function CashflowView({ leads }) {
         _key: "bank_" + t.unique_id, _type: "bank", _uid: t.unique_id,
         _isCardDebit: cardDebit, _isCard: isCard,
         _isNonCashflow: isCard, // Individual card transactions are NOT cashflow
-        date: t.activity_date, description: t.description, memo: t.memo,
+        date: t.activity_date, description: m.display_name || t.description, _origDesc: t.description, memo: t.memo,
         amount: t.charged_amount,
         domain: m.domain || autoDomain, category: effectiveCat,
         _autoCat: !savedCat && autoCat ? true : false,
@@ -765,7 +765,7 @@ function CashflowView({ leads }) {
                   rows.push(
                     <tr key={t._key}>
                       <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
-                      <td style={S.td}>{t.description}</td>
+                      <td style={S.td}><input style={{ ...S.inp, padding: "2px 6px", fontSize: 12 }} value={ef.display_name} onChange={e => setEf(p => ({ ...p, display_name: e.target.value }))} /></td>
                       <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
                       <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
                       <td style={S.td}>
@@ -796,7 +796,7 @@ function CashflowView({ leads }) {
 
                 // Normal row
                 rows.push(
-                  <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ domain: m.domain || (t.amount > 0 ? "biz" : ""), category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : undefined}>
+                  <tr key={t._key} style={{ cursor: isBank ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ display_name: m.display_name || t.description, domain: m.domain || (t.amount > 0 ? "biz" : ""), category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : undefined}>
                     <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
                     <td style={S.td}>
                       {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
@@ -947,21 +947,24 @@ function DashboardView() {
   }, [yearTxns, year]);
 
   // Category breakdown for expenses
+  const EXPENSE_ONLY_CATS = new Set([...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]);
+  const INCOME_ONLY_CATS = new Set(INCOME_CATS);
+
   const expenseByCat = useMemo(() => {
     const cats = {};
-    yearTxns.filter(t => t.charged_amount < 0).forEach(t => {
+    yearTxns.filter(t => t.charged_amount < 0 && !INCOME_ONLY_CATS.has(t.category)).forEach(t => {
       const c = t.category || "ללא קטגוריה";
       cats[c] = (cats[c] || 0) + Math.abs(t.charged_amount);
     });
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [yearTxns]);
 
-  // Category breakdown for income
+  // Category breakdown for income — use income_source first, then category (skip expense cats)
   const incomeByCat = useMemo(() => {
     const cats = {};
     yearTxns.filter(t => t.charged_amount > 0).forEach(t => {
-      const c = t.category || t.income_source || "ללא קטגוריה";
-      cats[c] = (cats[c] || 0) + t.charged_amount;
+      const label = t.income_source || (EXPENSE_ONLY_CATS.has(t.category) ? "אחר" : t.category) || "ללא קטגוריה";
+      cats[label] = (cats[label] || 0) + t.charged_amount;
     });
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [yearTxns]);
