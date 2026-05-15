@@ -133,7 +133,7 @@ function NotifPanel({notifs,onClose,onSelect}){const dismiss=(n)=>{if(n.dismissK
 
 const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר","העברות לאפיק/משותף"];
 const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תחזוקת רכב","דלק","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ ומיסים","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
-const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה"];
+const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה","החזרים"];
 const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
 const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"gift",label:"מתנה"}];
 
@@ -174,9 +174,10 @@ const CAT_DEFAULTS = {
   "הכנסה": { domain: "biz", includes_vat: "כן", vat_deductible: "" },
   "הכנסה בחוב": { domain: "biz", includes_vat: "כן", vat_deductible: "" },
   "הכנסה עתידית": { domain: "biz", includes_vat: "כן", vat_deductible: "" },
-  "מתנה": { domain: "gift", includes_vat: "לא", vat_deductible: "" },
+  "מתנה": { domain: "gift", includes_vat: "לא", vat_deductible: "", income_source: "מתנה" },
+  "החזרים": { domain: "biz", includes_vat: "לא", vat_deductible: "", income_source: "החזרים" },
 };
-const INCOME_SOURCES=["הקלטה","מיקס","הפקה","הפקה - אפיק","לייב סשן","פודקאסט","צילום קורס","השכרת חלל","בית ריק","ייעוץ אומנותי - נימשי","ייעוץ אומנותי - אפיק","בקליין","הופעות","שוכרי משנה","מיקסים","תמלוגים","אחר"];
+const INCOME_SOURCES=["הקלטה","מיקס","הפקה","הפקה - אפיק","לייב סשן","פודקאסט","צילום קורס","השכרת חלל","בית ריק","ייעוץ אומנותי - נימשי","ייעוץ אומנותי - אפיק","בקליין","הופעות","שוכרי משנה","מיקסים","תמלוגים","מתנה","הלוואה","החזרים","אחר"];
 const PAY_METHODS=["אשראי","העברה","מזומן","הוראת קבע","ביט","פייבוקס","אחר"];
 const TXN_STATUSES=["שולם/התקבל","בחוב","עתידי"];
 
@@ -209,7 +210,7 @@ const AUTO_CAT_MAP = {
   // הלוואות וקרנות
   "הלוואה": "הלוואות וקרנות", "אלטשולר שחם": "הלוואות וקרנות",
   // ריביות ועמלות
-  "עמלת פעולה": "ריביות ועמלות", "דמי כרטיס": "ריביות ועמלות", "ריבית על מסגרת": "ריביות ועמלות", "ריבית בגין": "ריביות ועמלות", "זיכוי בגין הטבה": "ריביות ועמלות",
+  "עמלת פעולה": "ריביות ועמלות", "דמי כרטיס": "ריביות ועמלות", "ריבית על מסגרת": "ריביות ועמלות", "ריבית בגין": "ריביות ועמלות",
   // מעמ ומיסים
   "אגף המכס": "מעמ ומיסים", "מס הכנסה": "מעמ ומיסים",
   // ציוד
@@ -220,6 +221,8 @@ const AUTO_CAT_MAP = {
   "bolt": "משתנות", "paybox": "משתנות", "giveback": "משתנות", "airalo": "משתנות", "הום סנטר": "משתנות", "הום סטופ": "משתנות", "אייס פולג": "משתנות",
   // תמלוגים
   'אקו"ם': "הכנסה",
+  // החזרים
+  "זיכוי בגין הטבה": "החזרים", "פרעון מוקדם": "החזרים",
 };
 
 function autoCategoryFromMap(description, learnedCats) {
@@ -327,7 +330,7 @@ function LinkLeadModal({ leads, onSelect, onClose }) {
 function ManualTxnForm({ onSave, onClose }) {
   const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "", includes_vat: "", vat_deductible: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const setCat = (cat) => { const d = CAT_DEFAULTS[cat]; setF(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible } : {}) })); };
+  const setCat = (cat) => { const d = CAT_DEFAULTS[cat]; setF(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); };
   const setType = (t) => setF(p => ({ ...p, type: t, domain: t === "income" ? "biz" : p.domain }));
   const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), status: "planned" }); onClose(); };
   return (
@@ -353,7 +356,7 @@ function RecurringForm({ onSave, onClose, initial }) {
   const isEdit = !!initial;
   const [f, setF] = useState(initial ? { description: initial.description || "", amount: String(initial.amount || ""), type: initial.type || "expense", domain: initial.domain || "", category: initial.category || "", day_of_month: initial.day_of_month || 1, end_date: initial.end_date || "", income_source: initial.income_source || "", includes_vat: initial.includes_vat || "", vat_deductible: initial.vat_deductible || "" } : { description: "", amount: "", type: "expense", domain: "", category: "", day_of_month: 1, end_date: "", income_source: "", includes_vat: "", vat_deductible: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const setCat = (cat) => { const d = CAT_DEFAULTS[cat]; setF(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible } : {}) })); };
+  const setCat = (cat) => { const d = CAT_DEFAULTS[cat]; setF(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); };
   const setType = (t) => setF(p => ({ ...p, type: t, domain: t === "income" ? "biz" : p.domain }));
   const submit = () => { if (!f.description.trim() || !f.amount) return; onSave({ ...f, amount: Number(f.amount), is_active: true, end_date: f.end_date || null }); onClose(); };
   return (
@@ -558,7 +561,7 @@ function CashflowView({ leads }) {
         vat_deductible: m.vat_deductible || (catDef ? catDef.vat_deductible : ""),
         payment_method: m.payment_method || autoPayMethod(t.description, t.company_id),
         status: m.status || "שולם/התקבל",
-        linked_lead_id: m.linked_lead_id || null, income_source: m.income_source || ""
+        linked_lead_id: m.linked_lead_id || null, income_source: m.income_source || (catDef ? catDef.income_source || "" : "")
       });
     });
     // Manual transactions (not matched)
@@ -824,7 +827,7 @@ function CashflowView({ leads }) {
                         <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
                         {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, marginTop: 3 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור הכנסה</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
                       </td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible } : {}) })); }}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
                       <td style={S.td}>
                         <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, marginBottom: 3 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
                         <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10 }} value={ef.includes_vat || ""} onChange={e => setEf(p => ({ ...p, includes_vat: e.target.value }))}><option value="">כולל מע״מ?</option><option value="כן">כולל מע״מ</option><option value="לא">ללא מע״מ</option></select>
@@ -982,6 +985,13 @@ function DashboardView() {
     return true;
   });
 
+  // Category sets (must be defined before use in useMemo)
+  const EXCLUDE_EXPENSE_CATS = new Set(["הורדת אשראי", "לא תזרימי"]);
+  const EXPENSE_ONLY_CATS = new Set([...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]);
+  const INCOME_ONLY_CATS = new Set(INCOME_CATS);
+  const HOME_CATS = new Set(EXPENSE_CATS_HOME);
+  const BIZ_CATS = new Set(EXPENSE_CATS_BIZ);
+
   // Monthly breakdown (exclude credit card debit lines to avoid double counting)
   const monthlyData = useMemo(() => {
     const months = {};
@@ -992,7 +1002,6 @@ function DashboardView() {
     yearTxns.forEach(t => {
       const key = t.activity_date?.slice(0, 7);
       if (!key || !months[key]) return;
-      // Skip credit card debit lines and non-cashflow categories
       if (EXCLUDE_EXPENSE_CATS.has(t.category)) return;
       if (t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט")) return;
       if (t.charged_amount > 0) months[key].income += t.charged_amount;
@@ -1000,13 +1009,6 @@ function DashboardView() {
     });
     return Object.entries(months).map(([k, v]) => ({ month: k, ...v }));
   }, [yearTxns, year]);
-
-  // Categories to exclude from expense charts (non-real-expenses)
-  const EXCLUDE_EXPENSE_CATS = new Set(["הורדת אשראי", "לא תזרימי"]);
-  const EXPENSE_ONLY_CATS = new Set([...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]);
-  const INCOME_ONLY_CATS = new Set(INCOME_CATS);
-  const HOME_CATS = new Set(EXPENSE_CATS_HOME);
-  const BIZ_CATS = new Set(EXPENSE_CATS_BIZ);
 
   // Filter out credit card debit lines from bank (to avoid double counting)
   const realExpenseTxns = yearTxns.filter(t =>
