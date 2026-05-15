@@ -131,7 +131,7 @@ function useNotifications(leads,tasks,interactions){return useMemo(()=>{const n=
 
 function NotifPanel({notifs,onClose,onSelect}){return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>🔔 התראות ({notifs.length})</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={{display:"flex",flexDirection:"column",gap:4}}>{notifs.map((n,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",background:"#0F172A",borderRadius:8,padding:"10px 12px",cursor:"pointer",borderRight:`3px solid ${n.type==="lead"?"#F59E0B":"#EF4444"}`}} onClick={()=>{onSelect(n.leadId);onClose();}}><span style={{fontSize:14}}>{n.type==="lead"?"⚠️":"⏰"}</span><span style={{fontSize:13,flex:1}}>{n.text}</span></div>)}{notifs.length===0&&<p style={S.empty}>אין התראות 🎉</p>}</div></Modal>);}
 
-const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר"];
+const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר","העברות לאפיק/משותף"];
 const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תחזוקת רכב","דלק","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ ומיסים","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
 const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה","תמלוגים"];
 const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
@@ -145,6 +145,7 @@ const CAT_DEFAULTS = {
   "פארם": { domain: "home", includes_vat: "כן", vat_deductible: "לא" },
   "משתנות": { domain: "home", includes_vat: "כן", vat_deductible: "לא" },
   "כושר": { domain: "home", includes_vat: "כן", vat_deductible: "לא" },
+  "העברות לאפיק/משותף": { domain: "home", includes_vat: "לא", vat_deductible: "לא" },
   "שכד": { domain: "home", includes_vat: "לא", vat_deductible: "לא" },
   "חשבונות בית": { domain: "home", includes_vat: "כן", vat_deductible: "לא" },
   "ביטוחים": { domain: "home", includes_vat: "כן", vat_deductible: "לא" },
@@ -625,7 +626,8 @@ function CashflowView({ leads }) {
     if (typeF === "income" && t.amount <= 0) return false;
     if (typeF === "expense" && t.amount > 0) return false;
     if (domainF && t.domain !== domainF) return false;
-    if (catF && t.category !== catF) return false;
+    if (catF === "__none__" && t.category) return false;
+    if (catF && catF !== "__none__" && t.category !== catF) return false;
     return true;
   });
 
@@ -707,7 +709,7 @@ function CashflowView({ leads }) {
         <button style={typeF === "income" ? { ...S.filterOn, background: "#10B981" } : S.filterOff} onClick={() => setTypeF(typeF === "income" ? "" : "income")}>הכנסות</button>
         <button style={typeF === "expense" ? { ...S.filterOn, background: "#EF4444" } : S.filterOff} onClick={() => setTypeF(typeF === "expense" ? "" : "expense")}>הוצאות</button>
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: domainF ? "#F59E0B" : "#1E293B", color: domainF ? "#fff" : "#64748B", border: "none" }} value={domainF} onChange={e => setDomainF(e.target.value)}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
-        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: catF ? "#8B5CF6" : "#1E293B", color: catF ? "#fff" : "#64748B", border: "none" }} value={catF} onChange={e => setCatF(e.target.value)}><option value="">קטגוריה</option>{ALL_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: catF ? "#8B5CF6" : "#1E293B", color: catF ? "#fff" : "#64748B", border: "none" }} value={catF} onChange={e => setCatF(e.target.value)}><option value="">קטגוריה</option><option value="__none__">⚠ ללא קטגוריה</option>{ALL_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
         <div style={{ flex: 1 }} />
         <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
       </div>
