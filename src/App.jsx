@@ -496,7 +496,14 @@ function CashflowView({ leads }) {
     try { await sb("manual_transactions", "DELETE", null, `?id=eq.${id}`); setManualTxns(p => p.filter(m => m.id !== id)); _showToast("✓ נמחק"); } catch (e) { _showToast("שגיאה", "error"); }
   };
   const updateManual = async (id, data) => {
-    try { const [r] = await sb("manual_transactions", "PATCH", data, `?id=eq.${id}`); setManualTxns(p => p.map(m => m.id === id ? r : m)); _showToast("✓ עודכן"); } catch (e) { _showToast("שגיאה", "error"); }
+    try {
+      // Only send columns that exist in manual_transactions
+      const safe = {};
+      ["date","description","amount","type","domain","category","status","notes","includes_vat","vat_deductible","income_source"].forEach(k => { if (data[k] !== undefined) safe[k] = data[k]; });
+      const [r] = await sb("manual_transactions", "PATCH", safe, `?id=eq.${id}`);
+      setManualTxns(p => p.map(m => m.id === id ? r : m));
+      _showToast("✓ עודכן");
+    } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
   };
   const addRecurring = async (data) => {
     try { const [r] = await sb("recurring_transactions", "POST", data); setRecurring(p => [r, ...p]); _showToast("✓ תנועה קבועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
@@ -569,7 +576,7 @@ function CashflowView({ leads }) {
     });
     // Manual transactions (not matched)
     manualTxns.filter(m => m.status !== "matched").forEach(m => {
-      rows.push({ _key: "manual_" + m.id, _type: "manual", _manualId: m.id, date: m.date, description: m.description, amount: m.type === "expense" ? -Math.abs(m.amount) : Math.abs(m.amount), domain: m.domain || "", category: m.category || "", status: m.status === "planned" ? "עתידי" : m.status === "confirmed" ? "שולם/התקבל" : m.status, linked_lead_id: m.linked_lead_id || null, notes: m.notes });
+      rows.push({ _key: "manual_" + m.id, _type: "manual", _manualId: m.id, date: m.date, description: m.description, amount: m.type === "expense" ? -Math.abs(m.amount) : Math.abs(m.amount), domain: m.domain || "", category: m.category || "", status: m.status === "planned" ? "עתידי" : m.status === "confirmed" ? "שולם/התקבל" : m.status, linked_lead_id: m.linked_lead_id || null, notes: m.notes, income_source: m.income_source || "", payment_method: m.payment_method || "" });
     });
     // Recurring projections (only future months not covered by bank/manual)
     // Build a map of month → amounts already present (bank + manual)
@@ -869,7 +876,7 @@ function CashflowView({ leads }) {
                       <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.status || ""} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                       <td style={S.td}>
                         <div style={{ display: "flex", gap: 2 }}>
-                          <button onClick={() => { updateManual(t._manualId, { date: ef.date, description: ef.display_name, amount: Number(ef.amount), domain: ef.domain, category: ef.category, payment_method: ef.payment_method, status: ef.status, income_source: ef.income_source }); setEditId(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                          <button onClick={() => { const statusMap = {"עתידי":"planned","שולם/התקבל":"confirmed","בחוב":"debt"}; updateManual(t._manualId, { date: ef.date, description: ef.display_name, amount: Number(ef.amount), domain: ef.domain, category: ef.category, status: statusMap[ef.status] || ef.status, income_source: ef.income_source || "" }); setEditId(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
                           <button onClick={() => { if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
                           <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
                         </div>
