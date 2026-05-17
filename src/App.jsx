@@ -286,18 +286,27 @@ function generateRecurringProjections(recurring) {
   return projections;
 }
 
-function findPotentialMatches(bankTxns, projections) {
+function findPotentialMatches(bankTxns, projections, meta) {
   const matches = [];
+  const metaMap = {};
+  meta.forEach(m => { metaMap[m.unique_id] = m; });
+  const dismissed = JSON.parse(localStorage.getItem("princess_match_dismissed") || "{}");
   for (const proj of projections) {
     const projMonth = proj.date.slice(0, 7);
     const projAmt = Math.abs(proj.amount);
     for (const bank of bankTxns) {
       const bankMonth = bank.activity_date?.slice(0, 7);
       if (bankMonth !== projMonth) continue;
+      // Skip already categorized bank transactions
+      const m = metaMap[bank.unique_id];
+      if (m && m.category) continue;
+      // Skip dismissed matches
+      const dKey = `${bank.unique_id}_${proj._recurringId}`;
+      if (dismissed[dKey]) continue;
       const bankAmt = Math.abs(bank.charged_amount);
       const diff = Math.abs(bankAmt - projAmt);
-      if (diff / projAmt < 0.05 || diff < 5) {
-        matches.push({ bank, proj });
+      if (diff / projAmt < 0.15 || diff < 10) {
+        matches.push({ bank, proj, dismissKey: dKey });
         break;
       }
     }
@@ -665,7 +674,7 @@ function CashflowView({ leads }) {
   const balance = totalIncome - totalExpense;
 
   // Potential matches for confirmation
-  const potentialMatches = useMemo(() => findPotentialMatches(txns, projections), [txns, projections]);
+  const potentialMatches = useMemo(() => findPotentialMatches(txns, projections, meta), [txns, projections, meta]);
 
   if (loading) return <div style={S.empty}>טוען תנועות...</div>;
   return (
@@ -701,7 +710,7 @@ function CashflowView({ leads }) {
       {potentialMatches.length > 0 && !month && (
         <div style={{ ...S.statCard, marginBottom: 12, borderRight: "3px solid #F59E0B" }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#F59E0B", marginBottom: 4 }}>⚡ תנועות להתאמה ({potentialMatches.length})</div>
-          {potentialMatches.slice(0, 3).map((m, i) => (
+          {potentialMatches.map((m, i) => (
             <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, padding: "4px 0", borderTop: i > 0 ? "1px solid #1E293B" : "none" }}>
               <span style={{ flex: 1 }}>{m.proj.description}</span>
               <span style={{ color: "#94A3B8" }}>→</span>
@@ -925,14 +934,36 @@ function CashflowView({ leads }) {
         <Modal onClose={() => setMatchConfirm(null)}>
           <div style={S.mHead}><h2 style={S.mTitle}>אישור התאמה</h2><button style={S.iconBtn} onClick={() => setMatchConfirm(null)}>{I.x}</button></div>
           <div style={{ fontSize: 13, marginBottom: 12 }}>
-            <p style={{ marginBottom: 8 }}>תנועה קבועה: <strong>{matchConfirm.proj.description}</strong></p>
-            <p style={{ marginBottom: 8 }}>תנועת בנק: <strong>{matchConfirm.bank.description}</strong></p>
-            <p>סכום: <span style={{ direction: "ltr", display: "inline-block" }}>₪{Math.abs(matchConfirm.bank.charged_amount).toLocaleString()}</span></p>
+            <p style={{ marginBottom: 8 }}>תנועה קבועה: <strong>{matchConfirm.proj.description}</strong> (₪{Math.abs(matchConfirm.proj.amount).toLocaleString()})</p>
+            <p style={{ marginBottom: 8 }}>תנועת בנק: <strong>{matchConfirm.bank.description}</strong> (₪{Math.abs(matchConfirm.bank.charged_amount).toLocaleString()})</p>
+            <p style={{ fontSize: 11, color: "#64748B" }}>{matchConfirm.bank.activity_date}</p>
           </div>
-          <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>האם זו אותה תנועה?</p>
+          <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>האם תנועת הבנק היא התנועה הקבועה?</p>
           <div style={S.mFoot}>
-            <button style={S.btn2} onClick={() => setMatchConfirm(null)}>לא</button>
-            <button style={S.btn1} onClick={() => { _showToast("✓ הותאם"); setMatchConfirm(null); }}>כן, זו התנועה</button>
+            <button style={S.btn2} onClick={() => {
+              // Mark as not-match so it won't show again
+              const dismissed = JSON.parse(localStorage.getItem("princess_match_dismissed") || "{}");
+              if (matchConfirm.dismissKey) dismissed[matchConfirm.dismissKey] = true;
+              localStorage.setItem("princess_match_dismissed", JSON.stringify(dismissed));
+              _showToast("✓ סומן כלא תואם");
+              setMatchConfirm(null);
+            }}>לא, תנועה אחרת</button>
+            <button style={S.btn1} onClick={async () => {
+              // Save recurring's category/domain/display_name to bank meta
+              const proj = matchConfirm.proj;
+              const r = recurring.find(x => x.id === proj._recurringId);
+              const metaUpdate = {
+                category: r?.category || proj.category || "",
+                domain: r?.domain || proj.domain || "",
+                display_name: proj.description,
+                income_source: r?.income_source || proj.income_source || "",
+                includes_vat: r?.includes_vat || "",
+                vat_deductible: r?.vat_deductible || "",
+              };
+              await saveMeta(matchConfirm.bank.unique_id, metaUpdate);
+              _showToast("✓ הותאם — תנועת הבנק סווגה");
+              setMatchConfirm(null);
+            }}>כן, זו התנועה</button>
           </div>
         </Modal>
       )}
