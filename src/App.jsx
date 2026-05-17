@@ -291,25 +291,51 @@ function findPotentialMatches(bankTxns, projections, meta) {
   const metaMap = {};
   meta.forEach(m => { metaMap[m.unique_id] = m; });
   const dismissed = JSON.parse(localStorage.getItem("princess_match_dismissed") || "{}");
+  
   for (const proj of projections) {
     const projMonth = proj.date.slice(0, 7);
     const projAmt = Math.abs(proj.amount);
+    const projDesc = (proj.description || "").toLowerCase().trim();
+    
+    // Skip if this recurring was dismissed for this month
+    const monthDismissKey = `${proj._recurringId}_${projMonth}`;
+    if (dismissed[monthDismissKey]) continue;
+    
+    let bestMatch = null;
+    
     for (const bank of bankTxns) {
       const bankMonth = bank.activity_date?.slice(0, 7);
       if (bankMonth !== projMonth) continue;
-      // Skip already categorized bank transactions
+      
+      // Skip already categorized
       const m = metaMap[bank.unique_id];
       if (m && m.category) continue;
-      // Skip dismissed matches
-      const dKey = `${bank.unique_id}_${proj._recurringId}`;
-      if (dismissed[dKey]) continue;
+      
+      const bankDesc = (bank.description || "").toLowerCase().trim();
       const bankAmt = Math.abs(bank.charged_amount);
-      const diff = Math.abs(bankAmt - projAmt);
-      if (diff / projAmt < 0.15 || diff < 10) {
-        matches.push({ bank, proj, dismissKey: dKey });
-        break;
+      
+      // Name matching: check if recurring name appears in bank description or vice versa
+      const projWords = projDesc.split(/[\s—\-]+/).filter(w => w.length > 2);
+      const nameMatch = projWords.some(w => bankDesc.includes(w)) || bankDesc.includes(projDesc);
+      
+      // Amount matching
+      const amtDiff = Math.abs(bankAmt - projAmt);
+      const amtMatch = amtDiff / Math.max(projAmt, 1) < 0.15 || amtDiff < 10;
+      
+      if (nameMatch && amtMatch) {
+        // Strong match: name + amount
+        bestMatch = { bank, proj, score: 2, dismissKey: monthDismissKey };
+        break; // Perfect match, no need to look further
+      } else if (nameMatch) {
+        // Name matches but amount different — still suggest
+        if (!bestMatch || bestMatch.score < 1.5) {
+          bestMatch = { bank, proj, score: 1.5, dismissKey: monthDismissKey };
+        }
       }
+      // No name match = no suggestion (Netflix can't be Dropbox)
     }
+    
+    if (bestMatch) matches.push(bestMatch);
   }
   return matches;
 }
