@@ -127,9 +127,41 @@ function TasksView({tasks,leads,onToggle,onDelete}){const pending=tasks.filter(t
 
 function ClientsView({leads,onSelect}){const clients=leads.filter(l=>l.status==="closed");const [svcFilter,setSvcFilter]=useState("");const [csFilter,setCsFilter]=useState("");const [search,setSearch]=useState("");const filtered=clients.filter(c=>{if(svcFilter&&c.service!==svcFilter)return false;if(csFilter&&c.client_status!==csFilter)return false;if(search&&!c.name.includes(search)&&!c.phone?.includes(search))return false;return true;});return(<div style={{padding:"8px 0 20px"}}><div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}><div style={S.searchBox}>{I.search}<input style={S.searchInp} value={search} onChange={e=>setSearch(e.target.value)} placeholder="חיפוש לקוח..."/></div></div><div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}><button style={!csFilter?S.filterOn:S.filterOff} onClick={()=>setCsFilter("")}>הכל ({clients.length})</button>{CLIENT_STATUSES.map(cs=>{const c=clients.filter(l=>l.client_status===cs.id).length;return <button key={cs.id} style={csFilter===cs.id?{...S.filterOn,background:cs.color}:S.filterOff} onClick={()=>setCsFilter(csFilter===cs.id?"":cs.id)}>{cs.label} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/>{SERVICES.map(svc=>{const c=clients.filter(l=>l.service===svc).length;if(c===0)return null;return <button key={svc} style={svcFilter===svc?S.filterOn:S.filterOff} onClick={()=>setSvcFilter(svcFilter===svc?"":svc)}>{svc} ({c})</button>;})}</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>{filtered.map(c=>{const cs=CLIENT_STATUSES.find(x=>x.id===c.client_status);return(<div key={c.id} style={{...S.card,cursor:"pointer"}} onClick={()=>onSelect(c)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:14,fontWeight:600}}>{c.name}</span>{cs&&<span style={{fontSize:10,background:cs.color+"20",color:cs.color,padding:"1px 8px",borderRadius:10,fontWeight:600}}>{cs.label}</span>}</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{c.service&&<span style={{fontSize:11,background:"#1E293B",color:"#94A3B8",padding:"1px 7px",borderRadius:4}}>{c.service}</span>}{c.amount>0&&<span style={{fontSize:11,color:"#10B981",fontWeight:600}}>₪{c.amount.toLocaleString()}</span>}</div>{c.phone&&<div style={{fontSize:11,color:"#475569",marginTop:4}}>{c.phone}</div>}</div>);})}</div>{filtered.length===0&&<p style={S.empty}>אין לקוחות</p>}</div>);}
 
-function useNotifications(leads,tasks,interactions){return useMemo(()=>{const n=[];const now=Date.now();const twoDays=2*86400000;const oneWeek=7*86400000;const dismissed=JSON.parse(localStorage.getItem("princess_dismissed_notifs")||"{}");leads.filter(l=>l.status==="in_progress").forEach(l=>{const li=interactions.filter(i=>i.lead_id===l.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];const lt=tasks.filter(t=>t.lead_id===l.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];const la=Math.max(li?new Date(li.date).getTime():0,lt?new Date(lt.created_at).getTime():0,new Date(l.updated_at).getTime());if(now-la>twoDays)n.push({type:"lead",id:l.id,text:`${l.name} — ללא פעילות יומיים+`,leadId:l.id});});leads.filter(l=>l.status==="frozen").forEach(l=>{const dismissKey=`frozen_${l.id}`;const dismissedAt=dismissed[dismissKey]?new Date(dismissed[dismissKey]).getTime():0;if(now-dismissedAt>oneWeek){const hasTasks=tasks.some(t=>t.lead_id===l.id&&!t.completed);n.push({type:"frozen",id:l.id,text:`❄️ ${l.name} — בהקפאה${hasTasks?" (יש משימות פתוחות)":""}`,leadId:l.id,dismissKey});}});tasks.filter(t=>!t.completed).forEach(t=>{const cr=new Date(t.created_at).getTime();if(now-cr>twoDays&&new Date(t.due_date)<new Date()){const lead=leads.find(l=>l.id===t.lead_id);n.push({type:"task",id:t.id,text:`⏰ ${lead?.name||""} — ${t.title}`,leadId:t.lead_id});}});return n;},[leads,tasks,interactions]);}
+function useNotifications(leads,tasks,interactions,refreshKey){return useMemo(()=>{const n=[];const now=Date.now();const twoDays=2*86400000;const oneWeek=7*86400000;const dismissed=JSON.parse(localStorage.getItem("princess_dismissed_notifs")||"{}");
+// Active leads without activity for 2+ days
+leads.filter(l=>l.status==="in_progress").forEach(l=>{const li=interactions.filter(i=>i.lead_id===l.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];const lt=tasks.filter(t=>t.lead_id===l.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];const la=Math.max(li?new Date(li.date).getTime():0,lt?new Date(lt.created_at).getTime():0,new Date(l.updated_at).getTime());if(now-la>twoDays)n.push({type:"lead",id:l.id,text:`${l.name} — ללא פעילות יומיים+`,leadId:l.id});});
+// Frozen leads
+leads.filter(l=>l.status==="frozen").forEach(l=>{
+  const leadTasks=tasks.filter(t=>t.lead_id===l.id&&!t.completed);
+  const futureTasks=leadTasks.filter(t=>t.due_date&&new Date(t.due_date)>new Date());
+  if(futureTasks.length>0){
+    // Has future tasks — notify 7 days before and 2 days before
+    futureTasks.forEach(t=>{
+      const due=new Date(t.due_date).getTime();
+      const daysUntil=(due-now)/86400000;
+      const dismissKey=`frozen_task_${t.id}`;
+      const dismissedAt=dismissed[dismissKey]?new Date(dismissed[dismissKey]).getTime():0;
+      if(daysUntil<=7&&daysUntil>2&&now-dismissedAt>twoDays){
+        n.push({type:"frozen",id:l.id,text:`❄️ ${l.name} — משימה בעוד ${Math.ceil(daysUntil)} ימים: ${t.title}`,leadId:l.id,dismissKey});
+      }else if(daysUntil<=2&&daysUntil>0){
+        n.push({type:"frozen",id:l.id,text:`❄️ ${l.name} — משימה מחר/מחרתיים: ${t.title}`,leadId:l.id,dismissKey});
+      }else if(daysUntil<=0){
+        n.push({type:"task",id:t.id,text:`⏰ ${l.name} — משימה שעבר זמנה: ${t.title}`,leadId:l.id});
+      }
+    });
+  }else{
+    // No future tasks — weekly reminder
+    const dismissKey=`frozen_${l.id}`;
+    const dismissedAt=dismissed[dismissKey]?new Date(dismissed[dismissKey]).getTime():0;
+    if(now-dismissedAt>oneWeek){
+      n.push({type:"frozen",id:l.id,text:`❄️ ${l.name} — בהקפאה${leadTasks.length>0?" (יש משימות פתוחות)":""}`,leadId:l.id,dismissKey});
+    }
+  }
+});
+// Overdue tasks
+tasks.filter(t=>!t.completed).forEach(t=>{const cr=new Date(t.created_at).getTime();if(now-cr>twoDays&&new Date(t.due_date)<new Date()){const lead=leads.find(l=>l.id===t.lead_id);if(lead?.status!=="frozen")n.push({type:"task",id:t.id,text:`⏰ ${lead?.name||""} — ${t.title}`,leadId:t.lead_id});}});return n;},[leads,tasks,interactions,refreshKey]);}
 
-function NotifPanel({notifs,onClose,onSelect}){const dismiss=(n)=>{if(n.dismissKey){const d=JSON.parse(localStorage.getItem("princess_dismissed_notifs")||"{}");d[n.dismissKey]=new Date().toISOString();localStorage.setItem("princess_dismissed_notifs",JSON.stringify(d));}onSelect(n.leadId);onClose();};return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>🔔 התראות ({notifs.length})</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={{display:"flex",flexDirection:"column",gap:4}}>{notifs.map((n,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",background:"#0F172A",borderRadius:8,padding:"10px 12px",cursor:"pointer",borderRight:`3px solid ${n.type==="lead"?"#F59E0B":n.type==="frozen"?"#64748B":"#EF4444"}`}} onClick={()=>dismiss(n)}><span style={{fontSize:14}}>{n.type==="lead"?"⚠️":n.type==="frozen"?"❄️":"⏰"}</span><span style={{fontSize:13,flex:1}}>{n.text}</span>{n.dismissKey&&<span style={{fontSize:10,color:"#475569"}}>לחץ להשתקה לשבוע</span>}</div>)}{notifs.length===0&&<p style={S.empty}>אין התראות 🎉</p>}</div></Modal>);}
+function NotifPanel({notifs,onClose,onSelect,onDismiss}){const dismiss=(n)=>{if(n.dismissKey){const d=JSON.parse(localStorage.getItem("princess_dismissed_notifs")||"{}");d[n.dismissKey]=new Date().toISOString();localStorage.setItem("princess_dismissed_notifs",JSON.stringify(d));}if(onDismiss)onDismiss();onSelect(n.leadId);onClose();};return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>🔔 התראות ({notifs.length})</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={{display:"flex",flexDirection:"column",gap:4}}>{notifs.map((n,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",background:"#0F172A",borderRadius:8,padding:"10px 12px",cursor:"pointer",borderRight:`3px solid ${n.type==="lead"?"#F59E0B":n.type==="frozen"?"#64748B":"#EF4444"}`}} onClick={()=>dismiss(n)}><span style={{fontSize:14}}>{n.type==="lead"?"⚠️":n.type==="frozen"?"❄️":"⏰"}</span><span style={{fontSize:13,flex:1}}>{n.text}</span>{n.dismissKey&&<span style={{fontSize:10,color:"#475569"}}>לחץ להשתקה לשבוע</span>}</div>)}{notifs.length===0&&<p style={S.empty}>אין התראות 🎉</p>}</div></Modal>);}
 
 const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר","העברות לאפיק/משותף"];
 const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תחזוקת רכב","דלק","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ ומיסים","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
@@ -1341,7 +1373,7 @@ export default function App(){
   const [leads,setLeads]=useState([]);const [interactions,setInteractions]=useState([]);const [tasks,setTasks]=useState([]);const [sessions,setSessions]=useState([]);const [packages,setPackages]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState(null);
   const [section,setSection]=useState("crm");
   const [view,setView]=useState("leads");
-  const [leadsMode,setLeadsMode]=useState("board");const [showForm,setShowForm]=useState(false);const [showNotifs,setShowNotifs]=useState(false);const [selectedLead,setSelectedLead]=useState(null);const [search,setSearch]=useState("");const [serviceFilter,setServiceFilter]=useState("");const [statusFilter,setStatusFilter]=useState("");const [sourceFilter,setSourceFilter]=useState("");const [taskFilter,setTaskFilter]=useState(false);const [dragId,setDragId]=useState(null);const toast=useToast();const notifs=useNotifications(leads,tasks,interactions);
+  const [leadsMode,setLeadsMode]=useState("board");const [showForm,setShowForm]=useState(false);const [showNotifs,setShowNotifs]=useState(false);const [selectedLead,setSelectedLead]=useState(null);const [search,setSearch]=useState("");const [serviceFilter,setServiceFilter]=useState("");const [statusFilter,setStatusFilter]=useState("");const [sourceFilter,setSourceFilter]=useState("");const [taskFilter,setTaskFilter]=useState(false);const [dragId,setDragId]=useState(null);const toast=useToast();const [notifRefresh,setNotifRefresh]=useState(0);const notifs=useNotifications(leads,tasks,interactions,notifRefresh);
 
   const load=useCallback(async()=>{try{const [l,i,t,s,pk]=await Promise.all([sb("leads","GET",null,"?order=updated_at.desc"),sb("interactions","GET",null,"?order=date.desc"),sb("tasks","GET",null,"?order=due_date.asc"),sb("podcast_sessions","GET",null,"?order=session_date.asc"),sb("podcast_packages","GET",null,"?order=created_at.desc")]);setLeads(l||[]);setInteractions(i||[]);setTasks(t||[]);setSessions(s||[]);setPackages(pk||[]);setError(null);}catch(e){setError(e.message);}finally{setLoading(false);}},[]);
   useEffect(()=>{load();},[load]);
@@ -1431,7 +1463,7 @@ export default function App(){
   {view==="dashboard"&&<DashboardView/>}
   {view==="stats"&&<Stats leads={leads}/>}
   {showForm&&<LeadForm onSave={addLead} onClose={()=>setShowForm(false)}/>}
-  {showNotifs&&<NotifPanel notifs={notifs} onClose={()=>setShowNotifs(false)} onSelect={id=>{const l=leads.find(x=>x.id===id);if(l)setSelectedLead(l);}}/>}
+  {showNotifs&&<NotifPanel notifs={notifs} onClose={()=>setShowNotifs(false)} onSelect={id=>{const l=leads.find(x=>x.id===id);if(l)setSelectedLead(l);}} onDismiss={()=>setNotifRefresh(r=>r+1)}/>}
   <Toast {...toast}/></div>);
 }
 
