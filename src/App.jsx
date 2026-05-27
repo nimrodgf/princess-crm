@@ -812,10 +812,15 @@ function CashflowView({ leads }) {
         <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
       </div>
 
-      {/* Transactions */}
+      {/* Transactions — Grid layout */}
       <div>
+        {/* Column headers */}
+        <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 35px 90px 60px 45px 20px 85px 75px 30px", gap: 4, padding: "6px 14px", fontSize: 10, color: "#475569", marginBottom: 4, position: "sticky", top: 0, background: "#0B1120", zIndex: 1 }}>
+          <span>תאריך</span><span>תיאור</span><span>תחום</span><span>קטגוריה</span><span>מקור</span><span>תשלום</span><span>מ</span><span style={{ textAlign: "left", direction: "ltr" }}>סכום</span><span style={{ textAlign: "left", direction: "ltr" }}>יתרה</span><span></span>
+        </div>
         {(() => {
           const seenMonths = new Set();
+          const catColors = { "מזון": "#F59E0B", "אוכל בחוץ": "#F59E0B", "שכד אולפן": "#3B82F6", "שכד": "#3B82F6", "ספקים": "#06B6D4", "ציוד": "#06B6D4", "דלק": "#EF4444", "תחזוקת רכב": "#EF4444", "תוכנות": "#8B5CF6", "שיווק": "#EC4899", "הכנסה": "#10B981", "הכנסה בחוב": "#F59E0B", "מתנה": "#EC4899", "החזרים": "#06B6D4", "טיפול": "#8B5CF6", "ביטוחים": "#64748B", "חשבונות בית": "#64748B", "חשבונות עסק": "#64748B", "הלוואות וקרנות": "#64748B", "פארם": "#F59E0B", "כושר": "#10B981", "תחבצ וחניונים": "#06B6D4", "מעמ ומיסים": "#EF4444", "העברות לאפיק/משותף": "#EC4899", "משתנות": "#64748B", "הורדת אשראי": "#F59E0B", "ריביות ועמלות": "#64748B" };
           return filtered.flatMap((t, i) => {
             const rowMonth = t.date?.slice(0, 7) || "";
             const isFirstOfMonth = rowMonth && !seenMonths.has(rowMonth);
@@ -830,7 +835,7 @@ function CashflowView({ leads }) {
               const mIncome = monthTxns.filter(x => x.amount > 0).reduce((s, x) => s + x.amount, 0);
               const mExpense = monthTxns.filter(x => x.amount < 0).reduce((s, x) => s + Math.abs(x.amount), 0);
               rows.push(
-                <div key={"month_" + rowMonth} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "#111827", borderRadius: 8, marginBottom: 6, cursor: "pointer", borderBottom: "2px solid #1E293B" }} onClick={() => toggleMonth(rowMonth)}>
+                <div key={"month_" + rowMonth} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "#111827", borderRadius: 8, marginBottom: 6, marginTop: i > 0 ? 8 : 0, cursor: "pointer", borderBottom: "2px solid #1E293B" }} onClick={() => toggleMonth(rowMonth)}>
                   <span style={{ fontSize: 11, color: "#64748B", transition: "transform 0.2s", transform: isHidden ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
                   <span style={{ fontSize: 13, fontWeight: 700 }}>{monthLabel}</span>
                   <span style={{ flex: 1 }} />
@@ -852,20 +857,24 @@ function CashflowView({ leads }) {
             const isEd = editId === t._key;
             const linkedLead = t.linked_lead_id ? leads.find(l => l.id === t.linked_lead_id) : null;
 
-            const borderColor = isNonCashflow ? "#334155" : isRecurring ? "#64748B" : isManual ? "#8B5CF6" : t.amount > 0 ? "#10B981" : "#EF4444";
-            const isFuture = isRecurring || (isManual && t.status === "עתידי");
+            const borderColor = isNonCashflow ? "#334155" : isRecurring ? "#64748B" : isManual ? "#8B5CF6" : isCardSummary ? "#F59E0B" : t.amount > 0 ? "#10B981" : "#EF4444";
+            const catColor = catColors[t.category] || "#64748B";
+            const vatLabel = t.includes_vat === "כן" ? (t.vat_deductible === "כן" ? "✓" : t.vat_deductible === "רכב" ? "🚗" : t.amount > 0 ? "✓" : "✗") : t.includes_vat === "לא" ? "—" : "";
+            const icon = isRecurring ? "🔄 " : isManual ? "✏️ " : isCard || isCardSummary ? "💳 " : "";
+            const gridCols = "50px 1fr 35px 90px 60px 45px 20px 85px 75px 30px";
 
-            // Card summary row
+            // Card summary
             if (isCardSummary) {
               rows.push(
-                <div key={t._key} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "#111827", borderRadius: 10, marginBottom: 4, borderRight: "3px solid #F59E0B" }}>
-                  <span style={{ fontSize: 12, color: "#64748B", minWidth: 50 }}>💳 {t.date ? fmtDate(t.date) : ""}</span>
-                  <span style={{ fontSize: 13, color: "#E2E8F0", flex: 1, fontWeight: 600 }}>{t.description}</span>
-                  <span style={{ fontSize: 10, color: "#64748B", minWidth: 28 }}></span>
-                  <span style={{ fontSize: 10, background: "#F59E0B20", color: "#F59E0B", padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>הורדת אשראי</span>
-                  <span style={{ fontSize: 10, color: "#475569", minWidth: 35 }}></span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#EF4444", direction: "ltr", minWidth: 80, textAlign: "left" }}>-₪{t._cardTotal.toLocaleString()}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: t._running !== null ? "#E2E8F0" : "#334155", minWidth: 75, textAlign: "left", direction: "ltr" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
+                <div key={t._key} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, alignItems: "center", padding: "10px 14px", background: "#111827", borderRadius: 10, marginBottom: 4, borderRight: "3px solid #F59E0B" }}>
+                  <span style={{ fontSize: 12, color: "#64748B" }}>💳 {t.date ? fmtDate(t.date) : ""}</span>
+                  <span style={{ fontSize: 12, color: "#E2E8F0", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.description}</span>
+                  <span></span>
+                  <span style={{ fontSize: 10, background: "#F59E0B20", color: "#F59E0B", padding: "1px 6px", borderRadius: 99, textAlign: "center" }}>הורדת אשראי</span>
+                  <span></span><span></span><span></span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#EF4444", direction: "ltr", textAlign: "left" }}>-₪{t._cardTotal.toLocaleString()}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: t._running !== null ? "#E2E8F0" : "#334155", direction: "ltr", textAlign: "left" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
+                  <span></span>
                 </div>
               );
               return rows;
@@ -883,10 +892,10 @@ function CashflowView({ leads }) {
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 100 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">קטגוריה</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.includes_vat || ""} onChange={e => setEf(p => ({ ...p, includes_vat: e.target.value }))}><option value="">מע״מ?</option><option value="כן">כולל</option><option value="לא">ללא</option></select>
                     {ef.includes_vat === "כן" && t.amount < 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 70 }} value={ef.vat_deductible || ""} onChange={e => setEf(p => ({ ...p, vat_deductible: e.target.value }))}><option value="">מוכר?</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select>}
-                    {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
                     <span style={{ flex: 1 }} />
                     <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
                     {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
@@ -910,8 +919,8 @@ function CashflowView({ leads }) {
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 100 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">קטגוריה</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select>
-                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 80 }} value={ef.status || ""} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 80 }} value={ef.status || ""} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span style={{ flex: 1 }} />
                     <button onClick={() => { const statusMap = {"עתידי":"planned","שולם/התקבל":"confirmed","בחוב":"debt"}; updateManual(t._manualId, { date: ef.date, description: ef.display_name, amount: Number(ef.amount), domain: ef.domain, category: ef.category, status: statusMap[ef.status] || ef.status, income_source: ef.income_source || "" }); setEditId(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
                     <button onClick={() => { if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
@@ -922,37 +931,34 @@ function CashflowView({ leads }) {
               return rows;
             }
 
-            // Category badge color
-            const catColors = { "מזון": "#F59E0B", "אוכל בחוץ": "#F59E0B", "שכד אולפן": "#3B82F6", "שכד": "#3B82F6", "ספקים": "#06B6D4", "ציוד": "#06B6D4", "דלק": "#EF4444", "תחזוקת רכב": "#EF4444", "תוכנות": "#8B5CF6", "שיווק": "#EC4899", "הכנסה": "#10B981", "הכנסה בחוב": "#F59E0B", "מתנה": "#EC4899", "החזרים": "#06B6D4", "טיפול": "#8B5CF6", "ביטוחים": "#64748B", "חשבונות בית": "#64748B", "חשבונות עסק": "#64748B", "הלוואות וקרנות": "#64748B", "פארם": "#F59E0B", "כושר": "#10B981", "תחבצ וחניונים": "#06B6D4", "מעמ ומיסים": "#EF4444", "העברות לאפיק/משותף": "#EC4899", "משתנות": "#64748B", "הורדת אשראי": "#F59E0B" };
-            const catColor = catColors[t.category] || "#64748B";
-
-            // Normal row — card style
+            // Normal row — grid
             rows.push(
               <div key={t._key} style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "10px 14px",
+                display: "grid", gridTemplateColumns: gridCols,
+                gap: 4, alignItems: "center", padding: "10px 14px",
                 background: "#111827", borderRadius: 10, marginBottom: 4,
                 borderRight: `3px solid ${borderColor}`,
                 cursor: (isBank || isManual) ? "pointer" : undefined
               }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ display_name: m.display_name || t.description, domain: m.domain || (t.amount > 0 ? "biz" : ""), category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : isManual ? () => { setEditId(t._key); setEf({ date: t.date || "", display_name: t.description || "", amount: String(Math.abs(t.amount) || ""), domain: t.domain || "", category: t.category || "", payment_method: t.payment_method || "", status: t.status || "עתידי", income_source: t.income_source || "" }); } : undefined}>
-                <span style={{ fontSize: 12, color: "#64748B", minWidth: 50 }}>{isRecurring ? "🔄 " : isManual ? "✏️ " : isCard ? "💳 " : ""}{t.date ? fmtDate(t.date) : ""}</span>
-                <span style={{ fontSize: 13, color: "#E2E8F0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 12, color: "#64748B", overflow: "hidden", whiteSpace: "nowrap" }}>{icon}{t.date ? fmtDate(t.date) : ""}</span>
+                <span style={{ fontSize: 12, color: "#E2E8F0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {t.description}
-                  {t.memo && <span style={{ color: "#475569", fontSize: 11 }}> ({t.memo})</span>}
-                  {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11 }}> ← {linkedLead.name}</span>}
-                  {isNonCashflow && <span style={{ color: "#64748B", fontSize: 10 }}> (פירוט)</span>}
+                  {t.memo && <span style={{ color: "#475569", fontSize: 10 }}> ({t.memo})</span>}
+                  {linkedLead && <span style={{ color: "#3B82F6", fontSize: 10 }}> ← {linkedLead.name}</span>}
+                  {isNonCashflow && <span style={{ color: "#64748B", fontSize: 9 }}> (פירוט)</span>}
                 </span>
-                <span style={{ fontSize: 10, color: "#64748B", minWidth: 28 }}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}</span>
-                {t.category ? <span style={{ fontSize: 10, background: catColor + "20", color: catColor, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap", flexShrink: 0 }}>{t.category}{t._autoCat && <span style={{ color: "#F59E0B", fontSize: 8, marginRight: 2 }}>⚡</span>}</span> : <span style={{ fontSize: 10, color: "#EF4444", padding: "2px 8px", borderRadius: 99, border: "1px dashed #EF444440", whiteSpace: "nowrap", flexShrink: 0 }}>ללא קטגוריה</span>}
-                {t.income_source && <span style={{ fontSize: 10, color: "#3B82F6", minWidth: 50, flexShrink: 0 }}>{t.income_source}</span>}
-                <span style={{ fontSize: 10, color: "#475569", minWidth: 35, flexShrink: 0 }}>{t.payment_method || ""}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", minWidth: 80, textAlign: "left", flexShrink: 0 }}>{t.amount > 0 ? "+" : "-"}₪{Math.abs(t.amount).toLocaleString()}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: t._running === null ? "#334155" : "#E2E8F0", direction: "ltr", minWidth: 75, textAlign: "left", flexShrink: 0 }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
-                {isRecurring && <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-                  <button onClick={(e) => { e.stopPropagation(); const r = recurring.find(x => x.id === t._recurringId); if (r) setEditRecurringItem(r); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.edit}</button>
-                  <button onClick={(e) => { e.stopPropagation(); setRecurringAction({ recurringId: t._recurringId, month: t.date?.slice(0, 7), description: t.description }); }} style={{ ...S.iconBtn, color: "#F59E0B" }}>⏸</button>
-                </div>}
-                {isManual && !isEd && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B", flexShrink: 0 }}>{I.trash}</button>}
-                {isBank && !isNonCashflow && !isEd && <span style={{ fontSize: 10, color: t.category && !t._autoCat ? "#10B981" : "#64748B", flexShrink: 0 }}>{t.category && !t._autoCat ? "✓" : "✎"}</span>}
+                <span style={{ fontSize: 10, color: "#64748B" }}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}</span>
+                {t.category ? <span style={{ fontSize: 10, background: catColor + "20", color: catColor, padding: "1px 6px", borderRadius: 99, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.category}{t._autoCat ? "⚡" : ""}</span> : <span style={{ fontSize: 10, color: "#EF4444", padding: "1px 6px", borderRadius: 99, border: "1px dashed #EF444440", textAlign: "center" }}>—</span>}
+                <span style={{ fontSize: 10, color: "#3B82F6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.income_source || ""}</span>
+                <span style={{ fontSize: 10, color: "#475569", overflow: "hidden", whiteSpace: "nowrap" }}>{t.payment_method || ""}</span>
+                <span style={{ fontSize: 10, color: vatLabel === "✓" || vatLabel === "🚗" ? "#10B981" : vatLabel === "✗" ? "#EF4444" : "#475569" }}>{vatLabel}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "left" }}>{t.amount > 0 ? "+" : "-"}₪{Math.abs(t.amount).toLocaleString()}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: t._running === null ? "#334155" : "#E2E8F0", direction: "ltr", textAlign: "left" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
+                <span style={{ display: "flex", gap: 1, fontSize: 10 }}>
+                  {isRecurring && <><span onClick={(e) => { e.stopPropagation(); const r = recurring.find(x => x.id === t._recurringId); if (r) setEditRecurringItem(r); }} style={{ color: "#64748B", cursor: "pointer" }}>✎</span><span onClick={(e) => { e.stopPropagation(); setRecurringAction({ recurringId: t._recurringId, month: t.date?.slice(0, 7), description: t.description }); }} style={{ color: "#F59E0B", cursor: "pointer" }}>⏸</span></>}
+                  {isManual && !isEd && <span onClick={(e) => { e.stopPropagation(); if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ color: "#64748B", cursor: "pointer" }}>🗑</span>}
+                  {isBank && !isNonCashflow && !isEd && <span style={{ color: t.category && !t._autoCat ? "#10B981" : "#64748B" }}>{t.category && !t._autoCat ? "✓" : "✎"}</span>}
+                </span>
               </div>
             );
             return rows;
