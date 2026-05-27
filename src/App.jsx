@@ -290,6 +290,7 @@ function generateRecurringProjections(recurring) {
   const projections = [];
   const now = new Date();
   const defaultEnd = new Date("2026-12-31");
+  const fmtLocal = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   for (const r of recurring) {
     if (!r.is_active) continue;
     const endDate = r.end_date ? new Date(r.end_date) : defaultEnd;
@@ -297,12 +298,12 @@ function generateRecurringProjections(recurring) {
     let d = new Date(now.getFullYear(), now.getMonth(), r.day_of_month || 1);
     if (d < now) d.setMonth(d.getMonth() + 1);
     while (d <= endDate) {
-      const monthKey = d.toISOString().slice(0, 7);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
       if (!skips.includes(monthKey)) {
         projections.push({
           _type: "recurring",
           _recurringId: r.id,
-          date: d.toISOString().slice(0, 10),
+          date: fmtLocal(d),
           description: r.description,
           amount: r.type === "expense" ? -Math.abs(r.amount) : Math.abs(r.amount),
           domain: r.domain || "",
@@ -311,8 +312,7 @@ function generateRecurringProjections(recurring) {
           status: "עתידי",
         });
       }
-      d = new Date(d);
-      d.setMonth(d.getMonth() + 1);
+      d = new Date(d.getFullYear(), d.getMonth() + 1, r.day_of_month || 1);
     }
   }
   return projections;
