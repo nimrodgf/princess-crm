@@ -815,8 +815,8 @@ function CashflowView({ leads }) {
       {/* Transactions — Grid layout */}
       <div>
         {/* Column headers */}
-        <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 35px 90px 60px 45px 20px 85px 75px 30px", gap: 4, padding: "6px 14px", fontSize: 10, color: "#475569", marginBottom: 4, position: "sticky", top: 0, background: "#0B1120", zIndex: 1 }}>
-          <span>תאריך</span><span>תיאור</span><span>תחום</span><span>קטגוריה</span><span>מקור</span><span>תשלום</span><span>מ</span><span style={{ textAlign: "left", direction: "ltr" }}>סכום</span><span style={{ textAlign: "left", direction: "ltr" }}>יתרה</span><span></span>
+        <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 35px 90px 60px 45px 20px 50px 85px 75px 30px", gap: 4, padding: "6px 14px", fontSize: 10, color: "#475569", marginBottom: 4, position: "sticky", top: 0, background: "#0B1120", zIndex: 1 }}>
+          <span>תאריך</span><span>תיאור</span><span>תחום</span><span>קטגוריה</span><span>מקור</span><span>תשלום</span><span>מ</span><span>סטטוס</span><span style={{ textAlign: "left", direction: "ltr" }}>סכום</span><span style={{ textAlign: "left", direction: "ltr" }}>יתרה</span><span></span>
         </div>
         {(() => {
           const seenMonths = new Set();
@@ -861,7 +861,7 @@ function CashflowView({ leads }) {
             const catColor = catColors[t.category] || "#64748B";
             const vatLabel = t.includes_vat === "כן" ? (t.vat_deductible === "כן" ? "✓" : t.vat_deductible === "רכב" ? "🚗" : t.amount > 0 ? "✓" : "✗") : t.includes_vat === "לא" ? "—" : "";
             const icon = isRecurring ? "🔄 " : isManual ? "✏️ " : isCard || isCardSummary ? "💳 " : "";
-            const gridCols = "50px 1fr 35px 90px 60px 45px 20px 85px 75px 30px";
+            const gridCols = "50px 1fr 35px 90px 60px 45px 20px 50px 85px 75px 30px";
 
             // Card summary
             if (isCardSummary) {
@@ -871,7 +871,7 @@ function CashflowView({ leads }) {
                   <span style={{ fontSize: 12, color: "#E2E8F0", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.description}</span>
                   <span></span>
                   <span style={{ fontSize: 10, background: "#F59E0B20", color: "#F59E0B", padding: "1px 6px", borderRadius: 99, textAlign: "center" }}>הורדת אשראי</span>
-                  <span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span>
                   <span style={{ fontSize: 14, fontWeight: 600, color: "#EF4444", direction: "ltr", textAlign: "left" }}>-₪{t._cardTotal.toLocaleString()}</span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: t._running !== null ? "#E2E8F0" : "#334155", direction: "ltr", textAlign: "left" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
                   <span></span>
@@ -952,6 +952,7 @@ function CashflowView({ leads }) {
                 <span style={{ fontSize: 10, color: "#3B82F6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.income_source || ""}</span>
                 <span style={{ fontSize: 10, color: "#475569", overflow: "hidden", whiteSpace: "nowrap" }}>{t.payment_method || ""}</span>
                 <span style={{ fontSize: 10, color: vatLabel === "✓" || vatLabel === "🚗" ? "#10B981" : vatLabel === "✗" ? "#EF4444" : "#475569" }}>{vatLabel}</span>
+                <span style={{ fontSize: 10, color: t.status === "בחוב" ? "#F59E0B" : t.status === "עתידי" ? "#3B82F6" : "#475569" }}>{t.status || ""}</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "left" }}>{t.amount > 0 ? "+" : "-"}₪{Math.abs(t.amount).toLocaleString()}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: t._running === null ? "#334155" : "#E2E8F0", direction: "ltr", textAlign: "left" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
                 <span style={{ display: "flex", gap: 1, fontSize: 10 }}>
