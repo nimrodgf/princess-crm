@@ -928,13 +928,13 @@ function CashflowView({ leads }) {
             rows.push(
               <div key={t._key} style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
-                background: isFuture ? "#0B112080" : "#111827", borderRadius: 10, marginBottom: 4,
+                background: isFuture ? "#0F172A" : isNonCashflow ? "#0F172A" : "#111827", borderRadius: 10, marginBottom: 4,
                 borderRight: `3px solid ${borderColor}`,
-                opacity: isNonCashflow ? 0.55 : isFuture ? 0.65 : 1,
+                opacity: 1,
                 cursor: (isBank || isManual) ? "pointer" : undefined
               }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ display_name: m.display_name || t.description, domain: m.domain || (t.amount > 0 ? "biz" : ""), category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : isManual ? () => { setEditId(t._key); setEf({ date: t.date || "", display_name: t.description || "", amount: String(Math.abs(t.amount) || ""), domain: t.domain || "", category: t.category || "", payment_method: t.payment_method || "", status: t.status || "עתידי", income_source: t.income_source || "" }); } : undefined}>
                 <span style={{ fontSize: 12, color: "#64748B", minWidth: 50 }}>{isRecurring ? "🔄" : isManual ? "✏️" : ""}{t.date ? fmtDate(t.date) : ""}</span>
-                <span style={{ fontSize: 13, color: isFuture ? "#94A3B8" : "#E2E8F0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 13, color: isFuture ? "#94A3B8" : isNonCashflow ? "#94A3B8" : "#E2E8F0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {t.description}
                   {t.memo && <span style={{ color: "#475569", fontSize: 11 }}> ({t.memo})</span>}
                   {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11 }}> ← {linkedLead.name}</span>}
