@@ -812,177 +812,148 @@ function CashflowView({ leads }) {
         <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead><tr>
-            <th style={S.th}>תאריך</th>
-            <th style={S.th}>תיאור</th>
-            <th style={S.th}>סכום</th>
-            <th style={S.th}>מצטבר</th>
-            <th style={S.th}>תחום</th>
-            <th style={S.th}>קטגוריה</th>
-            <th style={S.th}>תשלום</th>
-            <th style={S.th}>סטטוס</th>
-            <th style={S.th}></th>
-          </tr></thead>
-          <tbody>
-            {(() => {
-              const seenMonths = new Set();
-              return filtered.flatMap((t, i) => {
-                const rowMonth = t.date?.slice(0, 7) || "";
-                const isFirstOfMonth = rowMonth && !seenMonths.has(rowMonth);
-                if (rowMonth) seenMonths.add(rowMonth);
-                const isHidden = hiddenMonths.includes(rowMonth);
-                const rows = [];
+      {/* Transactions */}
+      <div>
+        {(() => {
+          const seenMonths = new Set();
+          return filtered.flatMap((t, i) => {
+            const rowMonth = t.date?.slice(0, 7) || "";
+            const isFirstOfMonth = rowMonth && !seenMonths.has(rowMonth);
+            if (rowMonth) seenMonths.add(rowMonth);
+            const isHidden = hiddenMonths.includes(rowMonth);
+            const rows = [];
 
-                // Month header row
-                if (isFirstOfMonth && !month) {
-                  const monthLabel = new Date(rowMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
-                  const monthTxns = filtered.filter(x => x.date?.startsWith(rowMonth) && !x._isNonCashflow);
-                  const mIncome = monthTxns.filter(x => x.amount > 0).reduce((s, x) => s + x.amount, 0);
-                  const mExpense = monthTxns.filter(x => x.amount < 0).reduce((s, x) => s + Math.abs(x.amount), 0);
-                  rows.push(
-                    <tr key={"month_" + rowMonth} style={{ background: "#111827", cursor: "pointer" }} onClick={() => toggleMonth(rowMonth)}>
-                      <td colSpan={9} style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, borderBottom: "2px solid #1E293B" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 11, color: "#64748B", transition: "transform 0.2s", transform: isHidden ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
-                          <span>{monthLabel}</span>
-                          <span style={{ flex: 1 }} />
-                          <span style={{ fontSize: 11, color: "#10B981", fontWeight: 600 }}>+₪{mIncome.toLocaleString()}</span>
-                          <span style={{ fontSize: 11, color: "#EF4444", fontWeight: 600 }}>-₪{mExpense.toLocaleString()}</span>
-                          <span style={{ fontSize: 11, color: mIncome - mExpense >= 0 ? "#10B981" : "#EF4444", fontWeight: 600 }}>= ₪{(mIncome - mExpense).toLocaleString()}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                }
+            // Month header
+            if (isFirstOfMonth && !month) {
+              const monthLabel = new Date(rowMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+              const monthTxns = filtered.filter(x => x.date?.startsWith(rowMonth) && !x._isNonCashflow);
+              const mIncome = monthTxns.filter(x => x.amount > 0).reduce((s, x) => s + x.amount, 0);
+              const mExpense = monthTxns.filter(x => x.amount < 0).reduce((s, x) => s + Math.abs(x.amount), 0);
+              rows.push(
+                <div key={"month_" + rowMonth} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "#111827", borderRadius: 8, marginBottom: 6, cursor: "pointer", borderBottom: "2px solid #1E293B" }} onClick={() => toggleMonth(rowMonth)}>
+                  <span style={{ fontSize: 11, color: "#64748B", transition: "transform 0.2s", transform: isHidden ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{monthLabel}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: 11, color: "#10B981", fontWeight: 600 }}>+₪{mIncome.toLocaleString()}</span>
+                  <span style={{ fontSize: 11, color: "#EF4444", fontWeight: 600 }}>-₪{mExpense.toLocaleString()}</span>
+                  <span style={{ fontSize: 11, color: mIncome - mExpense >= 0 ? "#10B981" : "#EF4444", fontWeight: 600 }}>= ₪{(mIncome - mExpense).toLocaleString()}</span>
+                </div>
+              );
+            }
 
-                // Skip rows of hidden months
-                if (isHidden && !month) return rows;
+            if (isHidden && !month) return rows;
 
-                const isBank = t._type === "bank";
-                const isManual = t._type === "manual";
-                const isRecurring = t._type === "recurring";
-                const isCardSummary = t._isCardSummary;
-                const isCard = t._isCard;
-                const isNonCashflow = t._isNonCashflow;
-                const isEd = editId === t._key;
-                const linkedLead = t.linked_lead_id ? leads.find(l => l.id === t.linked_lead_id) : null;
-                const rowBg = isNonCashflow ? "#1E293B08" : isCardSummary ? "#F59E0B10" : isRecurring ? "#0B112080" : isManual ? "#1E293B10" : undefined;
-                const typeIndicator = isCardSummary ? "💳" : isCard ? "💳" : isRecurring ? "🔄" : isManual ? "✏️" : "";
+            const isBank = t._type === "bank";
+            const isManual = t._type === "manual";
+            const isRecurring = t._type === "recurring";
+            const isCardSummary = t._isCardSummary;
+            const isCard = t._isCard;
+            const isNonCashflow = t._isNonCashflow;
+            const isEd = editId === t._key;
+            const linkedLead = t.linked_lead_id ? leads.find(l => l.id === t.linked_lead_id) : null;
 
-                // Card summary row
-                if (isCardSummary) {
-                  rows.push(
-                    <tr key={t._key} style={{ background: rowBg }}>
-                      <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
-                      <td style={{ ...S.td, fontWeight: 600 }}>{typeIndicator} {t.description}</td>
-                      <td style={{ ...S.td, fontWeight: 600, color: "#EF4444", direction: "ltr", textAlign: "right" }}>₪{t._cardTotal.toLocaleString()}</td>
-                      <td style={{ ...S.td, fontSize: 11, color: t._running !== null && t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
-                      <td style={S.td}></td>
-                      <td style={S.td}><span style={{ fontSize: 12 }}>הורדת אשראי</span></td>
-                      <td style={S.td}></td>
-                      <td style={S.td}><span style={{ fontSize: 12, color: "#3B82F6" }}>עתידי</span></td>
-                      <td style={S.td}></td>
-                    </tr>
-                  );
-                  return rows;
-                }
+            const borderColor = isNonCashflow ? "#334155" : isRecurring ? "#64748B" : isManual ? "#8B5CF6" : t.amount > 0 ? "#10B981" : "#EF4444";
+            const isFuture = isRecurring || (isManual && t.status === "עתידי");
 
-                // Edit mode
-                if (isEd && isBank) {
-                  rows.push(
-                    <tr key={t._key}>
-                      <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
-                      <td style={S.td}><input style={{ ...S.inp, padding: "2px 6px", fontSize: 12 }} value={ef.display_name} onChange={e => setEf(p => ({ ...p, display_name: e.target.value }))} /></td>
-                      <td style={{ ...S.td, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
-                      <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
-                      <td style={S.td}>
-                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
-                        {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, marginTop: 3 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור הכנסה</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
-                      </td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
-                      <td style={S.td}>
-                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, marginBottom: 3 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
-                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10 }} value={ef.includes_vat || ""} onChange={e => setEf(p => ({ ...p, includes_vat: e.target.value }))}><option value="">כולל מע״מ?</option><option value="כן">כולל מע״מ</option><option value="לא">ללא מע״מ</option></select>
-                      </td>
-                      <td style={S.td}>
-                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, marginBottom: 3 }} value={ef.status || "paid"} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                        {ef.includes_vat === "כן" && t.amount < 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10 }} value={ef.vat_deductible || ""} onChange={e => setEf(p => ({ ...p, vat_deductible: e.target.value }))}><option value="">מוכר למע״מ?</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select>}
-                      </td>
-                      <td style={S.td}>
-                        <div style={{ display: "flex", gap: 2 }}>
-                          <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
-                          {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
-                          <button onClick={() => setMakeRecurring({ description: t.description, amount: Math.abs(t.amount), type: t.amount > 0 ? "income" : "expense", day_of_month: t.date ? parseInt(t.date.split("-")[2]) : 1, domain: ef.domain || "", category: ef.category || "" })} style={{ ...S.iconBtn, color: "#8B5CF6" }} title="הפוך לקבועה">🔄</button>
-                          <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                  return rows;
-                }
+            // Card summary row
+            if (isCardSummary) {
+              rows.push(
+                <div key={t._key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#111827", borderRadius: 10, marginBottom: 4, borderRight: "3px solid #F59E0B" }}>
+                  <span style={{ fontSize: 12, color: "#64748B", minWidth: 50 }}>{t.date ? fmtDate(t.date) : ""}</span>
+                  <span style={{ fontSize: 13, color: "#E2E8F0", flex: 1, fontWeight: 600 }}>💳 {t.description}</span>
+                  <span style={{ fontSize: 10, background: "#F59E0B20", color: "#F59E0B", padding: "2px 8px", borderRadius: 99 }}>הורדת אשראי</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#EF4444", direction: "ltr", minWidth: 80, textAlign: "left" }}>-₪{t._cardTotal.toLocaleString()}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: t._running !== null && t._running >= 0 ? "#E2E8F0" : "#EF4444", minWidth: 75, textAlign: "left", direction: "ltr" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
+                </div>
+              );
+              return rows;
+            }
 
-                // Edit mode — manual transactions
-                if (isEd && isManual) {
-                  rows.push(
-                    <tr key={t._key}>
-                      <td style={S.td}><input style={{ ...S.inp, padding: "2px 6px", fontSize: 12 }} type="date" value={ef.date || ""} onChange={e => setEf(p => ({ ...p, date: e.target.value }))} dir="ltr" /></td>
-                      <td style={S.td}><input style={{ ...S.inp, padding: "2px 6px", fontSize: 12 }} value={ef.display_name} onChange={e => setEf(p => ({ ...p, display_name: e.target.value }))} /></td>
-                      <td style={{ ...S.td, direction: "ltr", textAlign: "right" }}><input style={{ ...S.inp, padding: "2px 6px", fontSize: 12, width: 80 }} type="number" value={ef.amount || ""} onChange={e => setEf(p => ({ ...p, amount: e.target.value }))} dir="ltr" /></td>
-                      <td style={{ ...S.td, fontSize: 11, color: "#475569" }}>—</td>
-                      <td style={S.td}>
-                        <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
-                        {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, marginTop: 3 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
-                      </td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">—</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></td>
-                      <td style={S.td}><select style={{ ...S.inp, padding: "2px 4px", fontSize: 11 }} value={ef.status || ""} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
-                      <td style={S.td}>
-                        <div style={{ display: "flex", gap: 2 }}>
-                          <button onClick={() => { const statusMap = {"עתידי":"planned","שולם/התקבל":"confirmed","בחוב":"debt"}; updateManual(t._manualId, { date: ef.date, description: ef.display_name, amount: Number(ef.amount), domain: ef.domain, category: ef.category, status: statusMap[ef.status] || ef.status, income_source: ef.income_source || "" }); setEditId(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
-                          <button onClick={() => { if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
-                          <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                  return rows;
-                }
+            // Edit mode — bank
+            if (isEd && isBank) {
+              rows.push(
+                <div key={t._key} style={{ padding: "10px 14px", background: "#1E293B", borderRadius: 10, marginBottom: 4, borderRight: "3px solid #3B82F6" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, color: "#64748B" }}>{t.date ? fmtDate(t.date) : ""}</span>
+                    <input style={{ ...S.inp, padding: "2px 6px", fontSize: 12, flex: 1, minWidth: 120 }} value={ef.display_name} onChange={e => setEf(p => ({ ...p, display_name: e.target.value }))} />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr" }}>₪{Math.abs(t.amount).toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 100 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">קטגוריה</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.includes_vat || ""} onChange={e => setEf(p => ({ ...p, includes_vat: e.target.value }))}><option value="">מע״מ?</option><option value="כן">כולל</option><option value="לא">ללא</option></select>
+                    {ef.includes_vat === "כן" && t.amount < 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 70 }} value={ef.vat_deductible || ""} onChange={e => setEf(p => ({ ...p, vat_deductible: e.target.value }))}><option value="">מוכר?</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select>}
+                    {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+                    <span style={{ flex: 1 }} />
+                    <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                    {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
+                    <button onClick={() => setMakeRecurring({ description: t.description, amount: Math.abs(t.amount), type: t.amount > 0 ? "income" : "expense", day_of_month: t.date ? parseInt(t.date.split("-")[2]) : 1, domain: ef.domain || "", category: ef.category || "" })} style={{ ...S.iconBtn, color: "#8B5CF6" }} title="הפוך לקבועה">🔄</button>
+                    <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
+                  </div>
+                </div>
+              );
+              return rows;
+            }
 
-                // Normal row
-                rows.push(
-                  <tr key={t._key} style={{ cursor: (isBank || isManual) ? "pointer" : undefined, background: rowBg, opacity: isNonCashflow ? 0.9 : 1 }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ display_name: m.display_name || t.description, domain: m.domain || (t.amount > 0 ? "biz" : ""), category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : isManual ? () => { setEditId(t._key); setEf({ date: t.date || "", display_name: t.description || "", amount: String(Math.abs(t.amount) || ""), domain: t.domain || "", category: t.category || "", payment_method: t.payment_method || "", status: t.status || "עתידי", income_source: t.income_source || "" }); } : undefined}>
-                    <td style={S.td}>{t.date ? fmtDate(t.date) : ""}</td>
-                    <td style={S.td}>
-                      {typeIndicator && <span style={{ marginLeft: 4, fontSize: 10 }}>{typeIndicator}</span>}
-                      {t.description}
-                      {t.memo && <span style={{ color: "#475569", fontSize: 11, marginRight: 6 }}> ({t.memo})</span>}
-                      {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11, marginRight: 6 }}> ← {linkedLead.name}</span>}
-                      {isNonCashflow && <span style={{ color: "#64748B", fontSize: 10, marginRight: 6 }}> (פירוט)</span>}
-                    </td>
-                    <td style={{ ...S.td, fontWeight: 600, color: isNonCashflow ? "#475569" : t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>₪{Math.abs(t.amount).toLocaleString()}</td>
-                    <td style={{ ...S.td, fontSize: 11, color: t._running === null ? "#475569" : t._running >= 0 ? "#10B981" : "#EF4444", direction: "ltr", textAlign: "right" }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</td>
-                    <td style={S.td}>{t.domain ? DOMAINS.find(d => d.id === t.domain)?.label : ""}{t.income_source && <span style={{ fontSize: 10, color: "#3B82F6", display: "block" }}>{t.income_source}</span>}</td>
-                    <td style={S.td}><span style={{ fontSize: 12 }}>{t.category || ""}{t._autoCat && <span style={{ color: "#F59E0B", fontSize: 9, marginRight: 3 }} title="קטגוריה אוטומטית">⚡</span>}</span></td>
-                    <td style={S.td}><span style={{ fontSize: 12 }}>{t.payment_method || ""}</span></td>
-                    <td style={S.td}><span style={{ fontSize: 12, color: t.status === "בחוב" ? "#F59E0B" : t.status === "עתידי" ? "#3B82F6" : "#475569" }}>{t.status || ""}</span></td>
-                    <td style={S.td}>
-                      {isBank && !isNonCashflow && (t.category && !t._autoCat ? <span style={{ color: "#10B981", fontSize: 10 }}>✓</span> : <span style={{ color: "#64748B", fontSize: 10 }}>✎</span>)}
-                      {isManual && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק תנועה ידנית?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>}
-                      {isRecurring && <div style={{ display: "flex", gap: 2 }}>
-                        <button onClick={() => { const r = recurring.find(x => x.id === t._recurringId); if (r) setEditRecurringItem(r); }} style={{ ...S.iconBtn, color: "#64748B" }} title="ערוך תנועה קבועה">{I.edit}</button>
-                        <button onClick={() => setRecurringAction({ recurringId: t._recurringId, month: t.date?.slice(0, 7), description: t.description })} style={{ ...S.iconBtn, color: "#F59E0B" }} title="דלג/השהה/מחק">⏸</button>
-                      </div>}
-                    </td>
-                  </tr>
-                );
-                return rows;
-              });
-            })()}
-          </tbody>
-        </table>
+            // Edit mode — manual
+            if (isEd && isManual) {
+              rows.push(
+                <div key={t._key} style={{ padding: "10px 14px", background: "#1E293B", borderRadius: 10, marginBottom: 4, borderRight: "3px solid #8B5CF6" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                    <input style={{ ...S.inp, padding: "2px 6px", fontSize: 12, width: 100 }} type="date" value={ef.date || ""} onChange={e => setEf(p => ({ ...p, date: e.target.value }))} dir="ltr" />
+                    <input style={{ ...S.inp, padding: "2px 6px", fontSize: 12, flex: 1, minWidth: 120 }} value={ef.display_name} onChange={e => setEf(p => ({ ...p, display_name: e.target.value }))} />
+                    <input style={{ ...S.inp, padding: "2px 6px", fontSize: 12, width: 80 }} type="number" value={ef.amount || ""} onChange={e => setEf(p => ({ ...p, amount: e.target.value }))} dir="ltr" />
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 100 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">קטגוריה</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select>
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 80 }} value={ef.status || ""} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+                    <span style={{ flex: 1 }} />
+                    <button onClick={() => { const statusMap = {"עתידי":"planned","שולם/התקבל":"confirmed","בחוב":"debt"}; updateManual(t._manualId, { date: ef.date, description: ef.display_name, amount: Number(ef.amount), domain: ef.domain, category: ef.category, status: statusMap[ef.status] || ef.status, income_source: ef.income_source || "" }); setEditId(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                    <button onClick={() => { if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
+                    <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
+                  </div>
+                </div>
+              );
+              return rows;
+            }
+
+            // Category badge color
+            const catColors = { "מזון": "#F59E0B", "אוכל בחוץ": "#F59E0B", "שכד אולפן": "#3B82F6", "שכד": "#3B82F6", "ספקים": "#06B6D4", "ציוד": "#06B6D4", "דלק": "#EF4444", "תחזוקת רכב": "#EF4444", "תוכנות": "#8B5CF6", "שיווק": "#EC4899", "הכנסה": "#10B981", "הכנסה בחוב": "#F59E0B", "מתנה": "#EC4899", "החזרים": "#06B6D4", "טיפול": "#8B5CF6", "ביטוחים": "#64748B", "חשבונות בית": "#64748B", "חשבונות עסק": "#64748B", "הלוואות וקרנות": "#64748B", "פארם": "#F59E0B", "כושר": "#10B981", "תחבצ וחניונים": "#06B6D4", "מעמ ומיסים": "#EF4444", "העברות לאפיק/משותף": "#EC4899", "משתנות": "#64748B" };
+            const catColor = catColors[t.category] || "#64748B";
+
+            // Normal row — card style
+            rows.push(
+              <div key={t._key} style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+                background: isFuture ? "#0B112080" : "#111827", borderRadius: 10, marginBottom: 4,
+                borderRight: `3px solid ${borderColor}`,
+                opacity: isNonCashflow ? 0.55 : isFuture ? 0.65 : 1,
+                cursor: (isBank || isManual) ? "pointer" : undefined
+              }} onClick={isBank ? () => { setEditId(t._key); const m = getMeta(t._uid); setEf({ display_name: m.display_name || t.description, domain: m.domain || (t.amount > 0 ? "biz" : ""), category: m.category || "", payment_method: m.payment_method || "", status: m.status || "שולם/התקבל", income_source: m.income_source || "", includes_vat: m.includes_vat || "", vat_deductible: m.vat_deductible || "" }); } : isManual ? () => { setEditId(t._key); setEf({ date: t.date || "", display_name: t.description || "", amount: String(Math.abs(t.amount) || ""), domain: t.domain || "", category: t.category || "", payment_method: t.payment_method || "", status: t.status || "עתידי", income_source: t.income_source || "" }); } : undefined}>
+                <span style={{ fontSize: 12, color: "#64748B", minWidth: 50 }}>{isRecurring ? "🔄" : isManual ? "✏️" : ""}{t.date ? fmtDate(t.date) : ""}</span>
+                <span style={{ fontSize: 13, color: isFuture ? "#94A3B8" : "#E2E8F0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {t.description}
+                  {t.memo && <span style={{ color: "#475569", fontSize: 11 }}> ({t.memo})</span>}
+                  {linkedLead && <span style={{ color: "#3B82F6", fontSize: 11 }}> ← {linkedLead.name}</span>}
+                  {isNonCashflow && <span style={{ color: "#64748B", fontSize: 10 }}> (פירוט)</span>}
+                </span>
+                {t.category && <span style={{ fontSize: 10, background: catColor + "20", color: catColor, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap", flexShrink: 0 }}>{t.category}{t._autoCat && <span style={{ color: "#F59E0B", fontSize: 9, marginRight: 2 }}>⚡</span>}</span>}
+                <span style={{ fontSize: 14, fontWeight: 600, color: isNonCashflow ? "#475569" : t.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr", minWidth: 80, textAlign: "left", flexShrink: 0 }}>{t.amount > 0 ? "+" : "-"}₪{Math.abs(t.amount).toLocaleString()}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: t._running === null ? "#334155" : isFuture ? "#94A3B8" : "#E2E8F0", direction: "ltr", minWidth: 75, textAlign: "left", flexShrink: 0 }}>{t._running !== null ? `₪${t._running.toLocaleString()}` : "—"}</span>
+                {isRecurring && <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                  <button onClick={(e) => { e.stopPropagation(); const r = recurring.find(x => x.id === t._recurringId); if (r) setEditRecurringItem(r); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.edit}</button>
+                  <button onClick={(e) => { e.stopPropagation(); setRecurringAction({ recurringId: t._recurringId, month: t.date?.slice(0, 7), description: t.description }); }} style={{ ...S.iconBtn, color: "#F59E0B" }}>⏸</button>
+                </div>}
+                {isManual && !isEd && <button onClick={(e) => { e.stopPropagation(); if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B", flexShrink: 0 }}>{I.trash}</button>}
+                {isBank && !isNonCashflow && !isEd && <span style={{ fontSize: 10, color: t.category && !t._autoCat ? "#10B981" : "#64748B", flexShrink: 0 }}>{t.category && !t._autoCat ? "✓" : "✎"}</span>}
+              </div>
+            );
+            return rows;
+          });
+        })()}
       </div>
       {filtered.length === 0 && <p style={S.empty}>אין תנועות</p>}
 
