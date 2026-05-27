@@ -813,9 +813,9 @@ function CashflowView({ leads }) {
       </div>
 
       {/* Transactions — Grid layout */}
-      <div>
+      <div style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto", borderRadius: 12 }}>
         {/* Column headers */}
-        <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 35px 90px 60px 45px 20px 50px 85px 75px 30px", gap: 4, padding: "6px 14px", fontSize: 10, color: "#475569", marginBottom: 4, position: "sticky", top: 0, background: "#0B1120", zIndex: 1 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "50px 1fr 35px 90px 60px 45px 20px 50px 85px 75px 30px", gap: 4, padding: "6px 14px", fontSize: 10, color: "#475569", marginBottom: 4, position: "sticky", top: 0, background: "#0B1120", zIndex: 1, borderBottom: "1px solid #1E293B" }}>
           <span>תאריך</span><span>תיאור</span><span>תחום</span><span>קטגוריה</span><span>מקור</span><span>תשלום</span><span>מ</span><span>סטטוס</span><span style={{ textAlign: "left", direction: "ltr" }}>סכום</span><span style={{ textAlign: "left", direction: "ltr" }}>יתרה</span><span></span>
         </div>
         {(() => {
