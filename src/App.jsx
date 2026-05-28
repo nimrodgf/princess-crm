@@ -395,7 +395,7 @@ function LinkLeadModal({ leads, onSelect, onClose }) {
 }
 
 function ManualTxnForm({ onSave, onClose }) {
-  const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "", includes_vat: "", vat_deductible: "" });
+  const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "", includes_vat: "", vat_deductible: "", payment_method: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const setCat = (cat) => { const d = CAT_DEFAULTS[cat]; setF(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); };
   const setType = (t) => setF(p => ({ ...p, type: t, domain: t === "income" ? "biz" : p.domain }));
@@ -410,6 +410,7 @@ function ManualTxnForm({ onSave, onClose }) {
         <div><label style={S.lbl}>סכום *</label><input style={S.inp} type="number" value={f.amount} onChange={e => set("amount", e.target.value)} dir="ltr" /></div>
         <div><label style={S.lbl}>תחום</label><select style={S.inp} value={f.domain} onChange={e => set("domain", e.target.value)}><option value="">—</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
         <div style={S.full}><label style={S.lbl}>קטגוריה</label><select style={S.inp} value={f.category} onChange={e => setCat(e.target.value)}><option value="">—</option>{(f.type === "income" ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+        <div><label style={S.lbl}>אמצעי תשלום</label><select style={S.inp} value={f.payment_method} onChange={e => set("payment_method", e.target.value)}><option value="">—</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
         <div><label style={S.lbl}>כולל מע״מ</label><select style={S.inp} value={f.includes_vat} onChange={e => set("includes_vat", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option></select></div>
         {f.includes_vat === "כן" && f.type === "expense" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
         <div style={S.full}><label style={S.lbl}>הערות</label><input style={S.inp} value={f.notes} onChange={e => set("notes", e.target.value)} placeholder="הערות" /></div>
@@ -566,7 +567,7 @@ function CashflowView({ leads }) {
     try {
       // Only send columns that exist in manual_transactions
       const safe = {};
-      ["date","description","amount","type","domain","category","status","notes","includes_vat","vat_deductible","income_source"].forEach(k => { if (data[k] !== undefined) safe[k] = data[k]; });
+      ["date","description","amount","type","domain","category","status","notes","includes_vat","vat_deductible","income_source","payment_method"].forEach(k => { if (data[k] !== undefined) safe[k] = data[k]; });
       const [r] = await sb("manual_transactions", "PATCH", safe, `?id=eq.${id}`);
       setManualTxns(p => p.map(m => m.id === id ? r : m));
       _showToast("✓ עודכן");
@@ -920,9 +921,10 @@ function CashflowView({ leads }) {
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.domain || ""} onChange={e => setEf(p => ({ ...p, domain: e.target.value }))}><option value="">תחום</option>{DOMAINS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 100 }} value={ef.category || ""} onChange={e => { const cat = e.target.value; const d = CAT_DEFAULTS[cat]; setEf(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); }}><option value="">קטגוריה</option>{(t.amount > 0 ? INCOME_CATS : [...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]).map(c => <option key={c} value={c}>{c}</option>)}</select>
                     {t.amount > 0 && <select style={{ ...S.inp, padding: "2px 4px", fontSize: 10, width: 80 }} value={ef.income_source || ""} onChange={e => setEf(p => ({ ...p, income_source: e.target.value }))}><option value="">מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+                    <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 70 }} value={ef.payment_method || ""} onChange={e => setEf(p => ({ ...p, payment_method: e.target.value }))}><option value="">תשלום</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select>
                     <select style={{ ...S.inp, padding: "2px 4px", fontSize: 11, width: 80 }} value={ef.status || ""} onChange={e => setEf(p => ({ ...p, status: e.target.value }))}>{TXN_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span style={{ flex: 1 }} />
-                    <button onClick={() => { const statusMap = {"עתידי":"planned","שולם/התקבל":"confirmed","בחוב":"debt"}; updateManual(t._manualId, { date: ef.date, description: ef.display_name, amount: Number(ef.amount), domain: ef.domain, category: ef.category, status: statusMap[ef.status] || ef.status, income_source: ef.income_source || "" }); setEditId(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
+                    <button onClick={() => { const statusMap = {"עתידי":"planned","שולם/התקבל":"confirmed","בחוב":"debt"}; updateManual(t._manualId, { date: ef.date, description: ef.display_name, amount: Number(ef.amount), domain: ef.domain, category: ef.category, payment_method: ef.payment_method || "", status: statusMap[ef.status] || ef.status, income_source: ef.income_source || "" }); setEditId(null); }} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
                     <button onClick={() => { if (confirm("למחוק?")) deleteManual(t._manualId); }} style={{ ...S.iconBtn, color: "#64748B" }}>{I.trash}</button>
                     <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
                   </div>
