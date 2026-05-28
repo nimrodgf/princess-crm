@@ -6,6 +6,7 @@ const GCAL_URL = "https://script.google.com/macros/s/AKfycbyFyUmXAmlQCuZHgtAKu_0
 const hdrs = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" };
 async function sb(table, method = "GET", body = null, query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { method, headers: hdrs, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
 async function sbMoneyman(query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { headers: { ...hdrs, "Accept-Profile": "moneyman" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
+async function sbMoneymanWrite(method, query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { method, headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return true; }
 async function addToCalendar(title, start, desc = "") { try { const r = await fetch(GCAL_URL, { method: "POST", body: JSON.stringify({ title, start, description: desc, duration: 30 }) }); return (await r.json()).success; } catch { return false; } }
 
 const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "frozen", label: "בהקפאה", color: "#64748B", bg: "#64748B15" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
@@ -565,23 +566,26 @@ function CashflowView({ leads, accountId = "biz" }) {
   };
 
   const addManual = async (data) => {
-    try { const [r] = await sb("manual_transactions", "POST", data); setManualTxns(p => [r, ...p]); _showToast("✓ תנועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
+    try { const [r] = await sb("manual_transactions", "POST", { ...data, account_id: accountId }); setManualTxns(p => [r, ...p]); _showToast("✓ תנועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
   };
   const deleteManual = async (id) => {
     try { await sb("manual_transactions", "DELETE", null, `?id=eq.${id}`); setManualTxns(p => p.filter(m => m.id !== id)); _showToast("✓ נמחק"); } catch (e) { _showToast("שגיאה", "error"); }
+  };
+  const deleteBankTxn = async (uid) => {
+    try { await sbMoneymanWrite("DELETE", `?unique_id=eq.${encodeURIComponent(uid)}`); setTxns(p => p.filter(t => t.unique_id !== uid)); _showToast("✓ תנועת בנק נמחקה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
   };
   const updateManual = async (id, data) => {
     try {
       // Only send columns that exist in manual_transactions
       const safe = {};
-      ["date","description","amount","type","domain","category","status","notes","includes_vat","vat_deductible","income_source","payment_method"].forEach(k => { if (data[k] !== undefined) safe[k] = data[k]; });
+      ["date","description","amount","type","domain","category","status","notes","includes_vat","vat_deductible","income_source","payment_method","account_id"].forEach(k => { if (data[k] !== undefined) safe[k] = data[k]; });
       const [r] = await sb("manual_transactions", "PATCH", safe, `?id=eq.${id}`);
       setManualTxns(p => p.map(m => m.id === id ? r : m));
       _showToast("✓ עודכן");
     } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
   };
   const addRecurring = async (data) => {
-    try { const [r] = await sb("recurring_transactions", "POST", data); setRecurring(p => [r, ...p]); _showToast("✓ תנועה קבועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
+    try { const [r] = await sb("recurring_transactions", "POST", { ...data, account_id: accountId }); setRecurring(p => [r, ...p]); _showToast("✓ תנועה קבועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
   };
   const updateRecurring = async (id, data) => {
     try { const [r] = await sb("recurring_transactions", "PATCH", data, `?id=eq.${id}`); setRecurring(p => p.map(x => x.id === id ? r : x)); } catch (e) { _showToast("שגיאה", "error"); }
@@ -599,7 +603,7 @@ function CashflowView({ leads, accountId = "biz" }) {
   const autoCategory = (description) => autoCategoryFromMap(description, learnedCats);
 
   // Build unified timeline
-  const projections = useMemo(() => generateRecurringProjections(recurring), [recurring]);
+  const projections = useMemo(() => generateRecurringProjections(recurring.filter(r => (r.account_id || "biz") === accountId)), [recurring, accountId]);
   const matchedManualIds = new Set(manualTxns.filter(m => m.status === "matched").map(m => m.id));
 
   // Detect credit card debit lines from bank (ישראכרט lump sum)
@@ -649,10 +653,12 @@ function CashflowView({ leads, accountId = "biz" }) {
         linked_lead_id: m.linked_lead_id || null, income_source: m.income_source || (catDef ? catDef.income_source || "" : "")
       });
     });
-    // Manual transactions (not matched)
-    manualTxns.filter(m => m.status !== "matched").forEach(m => {
+    // Manual transactions (not matched) — filter by account
+    manualTxns.filter(m => m.status !== "matched" && (m.account_id || "biz") === accountId).forEach(m => {
       rows.push({ _key: "manual_" + m.id, _type: "manual", _manualId: m.id, date: m.date, description: m.description, amount: m.type === "expense" ? -Math.abs(m.amount) : Math.abs(m.amount), domain: m.domain || "", category: m.category || "", status: m.status === "planned" ? "עתידי" : m.status === "confirmed" ? "שולם/התקבל" : m.status, linked_lead_id: m.linked_lead_id || null, notes: m.notes, income_source: m.income_source || "", payment_method: m.payment_method || "" });
     });
+    // Recurring projections — filter by account
+    const filteredProjections = projections.filter(p => (p._accountId || "biz") === accountId);
     // Recurring projections (only future months not covered by bank/manual)
     // Build a map of month → amounts already present (bank + manual)
     const existingByMonth = {};
@@ -662,7 +668,7 @@ function CashflowView({ leads, accountId = "biz" }) {
       if (!existingByMonth[m]) existingByMonth[m] = [];
       existingByMonth[m].push({ amount: r.amount, description: r.description, used: false });
     });
-    projections.forEach(p => {
+    filteredProjections.forEach(p => {
       const projMonth = p.date.slice(0, 7);
       const existing = existingByMonth[projMonth] || [];
       // Check if there's a matching transaction (same direction, similar amount ±15%, or same description)
@@ -789,7 +795,7 @@ function CashflowView({ leads, accountId = "biz" }) {
       )}
 
       {/* Recurring manager */}
-      <RecurringManager recurring={recurring} onAdd={addRecurring} onUpdate={updateRecurring} onDelete={deleteRecurring} onAction={(a) => setRecurringAction(a)} />
+      <RecurringManager recurring={recurring.filter(r => (r.account_id || "biz") === accountId)} onAdd={addRecurring} onUpdate={updateRecurring} onDelete={deleteRecurring} onAction={(a) => setRecurringAction(a)} />
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -908,6 +914,7 @@ function CashflowView({ leads, accountId = "biz" }) {
                     <button onClick={() => saveMeta(t._uid, ef)} style={{ ...S.iconBtn, color: "#10B981" }}>{I.check}</button>
                     {t.amount > 0 && <button onClick={() => setShowLinkModal(t._key)} style={{ ...S.iconBtn, color: "#3B82F6" }} title="קשר ללקוח">{I.link}</button>}
                     <button onClick={() => setMakeRecurring({ description: t.description, amount: Math.abs(t.amount), type: t.amount > 0 ? "income" : "expense", day_of_month: t.date ? parseInt(t.date.split("-")[2]) : 1, domain: ef.domain || "", category: ef.category || "" })} style={{ ...S.iconBtn, color: "#8B5CF6" }} title="הפוך לקבועה">🔄</button>
+                    <button onClick={() => { if (confirm("למחוק תנועת בנק?")) deleteBankTxn(t._uid); setEditId(null); }} style={{ ...S.iconBtn, color: "#EF4444" }} title="מחק תנועה">{I.trash}</button>
                     <button onClick={() => setEditId(null)} style={{ ...S.iconBtn, color: "#64748B" }}>{I.x}</button>
                   </div>
                 </div>
