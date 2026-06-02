@@ -396,7 +396,7 @@ function LinkLeadModal({ leads, onSelect, onClose }) {
 }
 
 function ManualTxnForm({ onSave, onClose }) {
-  const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "", includes_vat: "", vat_deductible: "", payment_method: "" });
+  const [f, setF] = useState({ date: new Date().toISOString().split("T")[0], description: "", amount: "", type: "expense", domain: "", category: "", notes: "", includes_vat: "", vat_deductible: "", payment_method: "", income_source: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const setCat = (cat) => { const d = CAT_DEFAULTS[cat]; setF(p => ({ ...p, category: cat, ...(d ? { domain: d.domain || p.domain, includes_vat: d.includes_vat || p.includes_vat, vat_deductible: d.vat_deductible || p.vat_deductible, income_source: d.income_source || p.income_source } : {}) })); };
   const setType = (t) => setF(p => ({ ...p, type: t, domain: t === "income" ? "biz" : p.domain }));
@@ -414,6 +414,7 @@ function ManualTxnForm({ onSave, onClose }) {
         <div><label style={S.lbl}>אמצעי תשלום</label><select style={S.inp} value={f.payment_method} onChange={e => set("payment_method", e.target.value)}><option value="">—</option>{PAY_METHODS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
         <div><label style={S.lbl}>כולל מע״מ</label><select style={S.inp} value={f.includes_vat} onChange={e => set("includes_vat", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option></select></div>
         {f.includes_vat === "כן" && f.type === "expense" && <div><label style={S.lbl}>מוכר למע״מ</label><select style={S.inp} value={f.vat_deductible} onChange={e => set("vat_deductible", e.target.value)}><option value="">—</option><option value="כן">כן</option><option value="לא">לא</option><option value="רכב">רכב</option></select></div>}
+        {f.type === "income" && <div><label style={S.lbl}>מקור הכנסה</label><select style={S.inp} value={f.income_source} onChange={e => set("income_source", e.target.value)}><option value="">—</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>}
         <div style={S.full}><label style={S.lbl}>הערות</label><input style={S.inp} value={f.notes} onChange={e => set("notes", e.target.value)} placeholder="הערות" /></div>
       </div>
       <div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.description.trim() || !f.amount}>שמור</button></div>
@@ -511,7 +512,7 @@ function CashflowView({ leads, accountId = "biz" }) {
   const [manualTxns, setManualTxns] = useState([]);
   const [recurring, setRecurring] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(String(new Date().getFullYear()));
   const [typeF, setTypeF] = useState("");
   const [domainF, setDomainF] = useState("");
   const [catF, setCatF] = useState("");
@@ -741,8 +742,12 @@ function CashflowView({ leads, accountId = "biz" }) {
     return true;
   });
 
-  const totalIncome = filtered.filter(t => t.amount > 0 && !t._isNonCashflow).reduce((s, t) => s + t.amount, 0);
-  const totalExpense = filtered.filter(t => t.amount < 0 && !t._isNonCashflow).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const [inclFuture, setInclFuture] = useState(false);
+  const actualTxns = filtered.filter(t => !t._isNonCashflow && t._type !== "recurring" && !(t._type === "manual" && t.status === "עתידי"));
+  const allTxns = filtered.filter(t => !t._isNonCashflow);
+  const summaryTxns = inclFuture ? allTxns : actualTxns;
+  const totalIncome = summaryTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const totalExpense = summaryTxns.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
   const balance = totalIncome - totalExpense;
 
   // Potential matches for confirmation
@@ -752,17 +757,19 @@ function CashflowView({ leads, accountId = "biz" }) {
   return (
     <div style={{ padding: "8px 0 20px" }}>
       {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 12 }}>
-        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
+        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות{inclFuture ? " (כולל עתידי)" : ""}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות{inclFuture ? " (כולל עתידי)" : ""}</div></div>
         <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: balance >= 0 ? "#10B981" : "#EF4444" }}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
-        <div style={S.statCard} onClick={() => setShowBalanceEdit(true)} title="לחץ לעדכן">
-          {currentBalance !== null ? (
-            <><div style={{ fontSize: 22, fontWeight: 800, color: "#3B82F6" }}>₪{currentBalance.toLocaleString()}</div><div style={S.statLbl}>יתרת פתיחה — {acctCfg.label} ✎</div></>
-          ) : (
-            <><div style={{ fontSize: 16, fontWeight: 600, color: "#F59E0B" }}>הגדר יתרה</div><div style={S.statLbl}>לחץ להזין יתרת פתיחה</div></>
-          )}
-        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+        <label style={{ fontSize: 11, color: "#64748B", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}><input type="checkbox" checked={inclFuture} onChange={e => setInclFuture(e.target.checked)} /> כולל עתידי</label>
+        <span style={{ flex: 1 }} />
+        {currentBalance !== null ? (
+          <span style={{ fontSize: 11, color: "#64748B", cursor: "pointer" }} onClick={() => setShowBalanceEdit(true)}>יתרת פתיחה: <span style={{ color: "#3B82F6", fontWeight: 600 }}>₪{currentBalance.toLocaleString()}</span> ✎</span>
+        ) : (
+          <span style={{ fontSize: 11, color: "#F59E0B", cursor: "pointer" }} onClick={() => setShowBalanceEdit(true)}>⚠ הגדר יתרת פתיחה</span>
+        )}
       </div>
 
       {/* Balance editor */}
