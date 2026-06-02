@@ -821,16 +821,6 @@ function CashflowView({ leads, accountId = "biz" }) {
         })()}
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14 }} value={months.includes(month) ? month : ""} onChange={e => setMonth(e.target.value)}><option value="">חודש...</option>{months.map(m => <option key={m} value={m}>{new Date(m + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</option>)}</select>
       </div>
-      {/* Individual month buttons when year is selected */}
-      {month && month.length === 4 && (
-        <div style={{ display: "flex", gap: 3, marginBottom: 6, flexWrap: "wrap" }}>
-          {Array.from({ length: 12 }, (_, i) => {
-            const m = `${month}-${String(i + 1).padStart(2, "0")}`;
-            const label = new Date(m + "-01").toLocaleDateString("he-IL", { month: "short" });
-            return <button key={m} style={S.filterOff} onClick={() => setMonth(m)}>{label}</button>;
-          })}
-        </div>
-      )}
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
         <button style={!typeF ? S.filterOn : S.filterOff} onClick={() => setTypeF("")}>הכל</button>
         <button style={typeF === "income" ? { ...S.filterOn, background: "#10B981" } : S.filterOff} onClick={() => setTypeF(typeF === "income" ? "" : "income")}>הכנסות</button>
@@ -860,7 +850,7 @@ function CashflowView({ leads, accountId = "biz" }) {
             const rows = [];
 
             // Month header
-            if (isFirstOfMonth && !month) {
+            if (isFirstOfMonth && (!month || month.length === 4)) {
               const monthLabel = new Date(rowMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
               const monthTxns = filtered.filter(x => x.date?.startsWith(rowMonth) && !x._isNonCashflow);
               const mIncome = monthTxns.filter(x => x.amount > 0).reduce((s, x) => s + x.amount, 0);
@@ -877,7 +867,7 @@ function CashflowView({ leads, accountId = "biz" }) {
               );
             }
 
-            if (isHidden && !month) return rows;
+            if (isHidden && (!month || month.length === 4)) return rows;
 
             const isBank = t._type === "bank";
             const isManual = t._type === "manual";
