@@ -1067,9 +1067,11 @@ function DashboardView() {
   const [txns, setTxns] = useState([]);
   const [meta, setMeta] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState("monthly");
   const [year, setYear] = useState(new Date().getFullYear());
-  const [dashMonth, setDashMonth] = useState("");
+  const [dashMonths, setDashMonths] = useState([]);
+  const [dashAcct, setDashAcct] = useState("all");
+  const [barHover, setBarHover] = useState(null);
+  const [pieHover, setPieHover] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -1079,7 +1081,6 @@ function DashboardView() {
   }, []);
 
   const getMeta = (uid) => meta.find(m => m.unique_id === uid) || {};
-
   const learnedCats = useMemo(() => buildLearnedCats(meta, txns), [meta, txns]);
 
   const merged = useMemo(() => txns.map(t => {
@@ -1094,34 +1095,42 @@ function DashboardView() {
       domain: m.domain || (catDef ? catDef.domain : ""),
       includes_vat: m.includes_vat || (catDef ? catDef.includes_vat : ""),
       vat_deductible: m.vat_deductible || (catDef ? catDef.vat_deductible : ""),
+      income_source: m.income_source || (catDef ? catDef.income_source || "" : ""),
       _uid: t.unique_id
     };
   }), [txns, meta, learnedCats]);
 
-  const yearTxns = merged.filter(t => {
+  // Account filter
+  const acctFiltered = useMemo(() => {
+    if (dashAcct === "all") return merged;
+    const cfg = ACCOUNT_CONFIGS[dashAcct];
+    return cfg ? merged.filter(cfg.filter) : merged;
+  }, [merged, dashAcct]);
+
+  // Year + month filter
+  const yearTxns = acctFiltered.filter(t => {
     if (!t.activity_date?.startsWith(String(year))) return false;
-    if (dashMonth) {
-      if (dashMonth.includes(",")) { const ms = dashMonth.split(","); if (!ms.some(m => t.activity_date?.startsWith(m))) return false; }
-      else if (dashMonth.length === 7) { if (!t.activity_date?.startsWith(dashMonth)) return false; }
+    if (dashMonths.length > 0) {
+      if (!dashMonths.some(m => t.activity_date?.startsWith(m))) return false;
     }
     return true;
   });
 
-  // Category sets (must be defined before use in useMemo)
+  // Category sets
   const EXCLUDE_EXPENSE_CATS = new Set(["הורדת אשראי", "לא תזרימי"]);
   const EXPENSE_ONLY_CATS = new Set([...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]);
   const INCOME_ONLY_CATS = new Set(INCOME_CATS);
   const HOME_CATS = new Set(EXPENSE_CATS_HOME);
   const BIZ_CATS = new Set(EXPENSE_CATS_BIZ);
 
-  // Monthly breakdown (exclude credit card debit lines to avoid double counting)
+  // Monthly breakdown
   const monthlyData = useMemo(() => {
     const months = {};
     for (let m = 1; m <= 12; m++) {
       const key = `${year}-${String(m).padStart(2, "0")}`;
       months[key] = { income: 0, expense: 0 };
     }
-    yearTxns.forEach(t => {
+    acctFiltered.filter(t => t.activity_date?.startsWith(String(year))).forEach(t => {
       const key = t.activity_date?.slice(0, 7);
       if (!key || !months[key]) return;
       if (EXCLUDE_EXPENSE_CATS.has(t.category)) return;
@@ -1130,9 +1139,9 @@ function DashboardView() {
       else months[key].expense += Math.abs(t.charged_amount);
     });
     return Object.entries(months).map(([k, v]) => ({ month: k, ...v }));
-  }, [yearTxns, year]);
+  }, [acctFiltered, year]);
 
-  // Filter out credit card debit lines from bank (to avoid double counting)
+  // Expenses
   const realExpenseTxns = yearTxns.filter(t =>
     t.charged_amount < 0 &&
     !INCOME_ONLY_CATS.has(t.category) &&
@@ -1140,7 +1149,6 @@ function DashboardView() {
     !(t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט"))
   );
 
-  // Home expenses
   const expenseHome = useMemo(() => {
     const cats = {};
     realExpenseTxns.filter(t => t.domain === "home" || HOME_CATS.has(t.category)).forEach(t => {
@@ -1150,7 +1158,6 @@ function DashboardView() {
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [realExpenseTxns]);
 
-  // Business expenses
   const expenseBiz = useMemo(() => {
     const cats = {};
     realExpenseTxns.filter(t => t.domain === "biz" || BIZ_CATS.has(t.category)).forEach(t => {
@@ -1160,7 +1167,6 @@ function DashboardView() {
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [realExpenseTxns]);
 
-  // All expenses (for totals)
   const expenseByCat = useMemo(() => {
     const cats = {};
     realExpenseTxns.forEach(t => {
@@ -1170,7 +1176,6 @@ function DashboardView() {
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [realExpenseTxns]);
 
-  // Income — use income_source, fallback to meaningful label
   const incomeByCat = useMemo(() => {
     const cats = {};
     yearTxns.filter(t => t.charged_amount > 0).forEach(t => {
@@ -1192,7 +1197,7 @@ function DashboardView() {
   const totalExpenseBiz = expenseBiz.reduce((s, [, v]) => s + v, 0);
   const totalIncome = incomeByCat.reduce((s, [, v]) => s + v, 0);
 
-  // VAT calculation
+  // VAT
   const vatData = useMemo(() => {
     let vatIncome = 0;
     let vatExpense = 0;
@@ -1213,8 +1218,9 @@ function DashboardView() {
     return { vatIncome: Math.round(vatIncome), vatExpense: Math.round(vatExpense), vatPayment: Math.round(vatIncome - vatExpense) };
   }, [yearTxns]);
 
-  // Pie chart SVG
-  function PieChart({ data, total, title }) {
+  // Pie chart with hover tooltip
+  function PieChart({ data, total, title, pieId }) {
+    const [hover, setHover] = useState(null);
     if (total === 0) return <div style={{ ...S.statCard, textAlign: "center" }}><div style={S.statLbl}>{title}</div><p style={S.empty}>אין נתונים</p></div>;
     let cumAngle = 0;
     const slices = data.map(([name, val], i) => {
@@ -1226,18 +1232,29 @@ function DashboardView() {
       const end = polarToCartesian(100, 100, 80, endAngle);
       const largeArc = pct > 0.5 ? 1 : 0;
       const d = `M 100 100 L ${start.x} ${start.y} A 80 80 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
-      return { name, val, pct, d, color: PIE_COLORS[i % PIE_COLORS.length] };
+      const midAngle = (startAngle + endAngle) / 2;
+      const labelPos = polarToCartesian(100, 100, 50, midAngle);
+      return { name, val, pct, d, color: PIE_COLORS[i % PIE_COLORS.length], labelPos };
     });
     return (
       <div style={S.statCard}>
         <div style={S.statLbl}>{title}</div>
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <svg viewBox="0 0 200 200" width="160" height="160" style={{ flexShrink: 0 }}>
-            {slices.map((s, i) => <path key={i} d={s.d} fill={s.color} stroke="#111827" strokeWidth="1" />)}
-          </svg>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <svg viewBox="0 0 200 200" width="160" height="160">
+              {slices.map((s, i) => <path key={i} d={s.d} fill={hover === i ? s.color : s.color + "CC"} stroke="#111827" strokeWidth="1" style={{ cursor: "pointer", transition: "opacity 0.1s" }} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />)}
+            </svg>
+            {hover !== null && slices[hover] && (
+              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center", pointerEvents: "none", background: "#0B1120E0", borderRadius: 8, padding: "6px 10px", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: slices[hover].color }}>{slices[hover].name}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#E2E8F0", direction: "ltr" }}>₪{slices[hover].val.toLocaleString()}</div>
+                <div style={{ fontSize: 11, color: "#94A3B8" }}>{Math.round(slices[hover].pct * 100)}%</div>
+              </div>
+            )}
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 120 }}>
             {slices.map((s, i) => (
-              <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11 }}>
+              <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11, opacity: hover !== null && hover !== i ? 0.4 : 1, cursor: "pointer", transition: "opacity 0.1s" }} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>{s.name}</span>
                 <span style={{ color: "#94A3B8", direction: "ltr" }}>₪{s.val.toLocaleString()}</span>
@@ -1250,8 +1267,9 @@ function DashboardView() {
     );
   }
 
-  // Bar chart SVG
+  // Bar chart with hover tooltip
   function BarChart({ data }) {
+    const [hover, setHover] = useState(null);
     const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1);
     const barW = 30;
     const gap = 12;
@@ -1273,11 +1291,18 @@ function DashboardView() {
               const hIncome = (d.income / maxVal) * chartH;
               const hExpense = (d.expense / maxVal) * chartH;
               const label = new Date(d.month + "-01").toLocaleDateString("he-IL", { month: "short" });
+              const isHovered = hover !== null && hover.idx === i;
               return (
                 <g key={d.month}>
-                  <rect x={x} y={chartH - hIncome} width={barW} height={hIncome} fill="#10B981" rx="3" />
-                  <rect x={x + barW + 2} y={chartH - hExpense} width={barW} height={hExpense} fill="#EF4444" rx="3" />
+                  <rect x={x} y={chartH - hIncome} width={barW} height={hIncome || 1} fill={isHovered && hover.type === "income" ? "#10B981" : "#10B98199"} rx="3" style={{ cursor: "pointer" }} onMouseEnter={() => setHover({ idx: i, type: "income", val: d.income, x: x, y: chartH - hIncome })} onMouseLeave={() => setHover(null)} />
+                  <rect x={x + barW + 2} y={chartH - hExpense} width={barW} height={hExpense || 1} fill={isHovered && hover.type === "expense" ? "#EF4444" : "#EF444499"} rx="3" style={{ cursor: "pointer" }} onMouseEnter={() => setHover({ idx: i, type: "expense", val: d.expense, x: x + barW + 2, y: chartH - hExpense })} onMouseLeave={() => setHover(null)} />
                   <text x={x + barW} y={chartH + 16} textAnchor="middle" fill="#64748B" fontSize="10" fontFamily="Rubik">{label}</text>
+                  {isHovered && (
+                    <g>
+                      <rect x={hover.x - 10} y={hover.y - 22} width={70} height={18} rx="4" fill="#0B1120E0" />
+                      <text x={hover.x + 25} y={hover.y - 10} textAnchor="middle" fill={hover.type === "income" ? "#10B981" : "#EF4444"} fontSize="11" fontFamily="Rubik" fontWeight="600">₪{hover.val.toLocaleString()}</text>
+                    </g>
+                  )}
                 </g>
               );
             })}
@@ -1290,35 +1315,57 @@ function DashboardView() {
 
   const years = [...new Set(txns.map(t => t.activity_date?.slice(0, 4)).filter(Boolean))].sort().reverse();
 
+  // Multi-month toggle (Shift = add/remove, normal = single select)
+  const toggleMonth = (m, shiftKey) => {
+    if (shiftKey) {
+      setDashMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+    } else {
+      setDashMonths(prev => prev.length === 1 && prev[0] === m ? [] : [m]);
+    }
+  };
+
+  const ACCT_TABS = [
+    { id: "all", label: "הכל", color: "#64748B" },
+    { id: "biz", label: "עסק", color: "#10B981" },
+    { id: "afik", label: "פוקסי", color: "#3B82F6" },
+    { id: "shared", label: "משותף", color: "#8B5CF6" },
+  ];
+
   if (loading) return <div style={S.empty}>טוען נתונים...</div>;
+
+  const periodLabel = dashMonths.length > 0
+    ? (dashMonths.length === 1 ? new Date(dashMonths[0] + "-01").toLocaleDateString("he-IL", { month: "long" }) : dashMonths.length + " חודשים")
+    : String(year);
+
   return (
     <div style={{ padding: "8px 0 20px" }}>
+      {/* Account tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+        {ACCT_TABS.map(tab => (
+          <button key={tab.id} style={{ border: "none", padding: "6px 16px", borderRadius: 10, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: dashAcct === tab.id ? 700 : 500, background: dashAcct === tab.id ? tab.color : "transparent", color: dashAcct === tab.id ? "#fff" : "#64748B" }} onClick={() => setDashAcct(tab.id)}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Year + month filters */}
       <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
-        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14 }} value={year} onChange={e => { setYear(Number(e.target.value)); setDashMonth(""); }}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select>
+        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14 }} value={year} onChange={e => { setYear(Number(e.target.value)); setDashMonths([]); }}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select>
         <span style={{ width: 1, height: 16, background: "#334155", margin: "0 2px" }} />
-        {(() => {
-          const now = new Date();
-          const curMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-          const nextMonth = new Date(now.getFullYear(), now.getMonth()+1, 1);
-          const twoMonths = `${curMonth},${nextMonth.getFullYear()}-${String(nextMonth.getMonth()+1).padStart(2,"0")}`;
-          return <>
-            <button style={!dashMonth ? S.filterOn : S.filterOff} onClick={() => setDashMonth("")}>כל השנה</button>
-            <button style={dashMonth === curMonth ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => { setYear(now.getFullYear()); setDashMonth(dashMonth === curMonth ? "" : curMonth); }}>החודש</button>
-            <button style={dashMonth === twoMonths ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => { setYear(now.getFullYear()); setDashMonth(dashMonth === twoMonths ? "" : twoMonths); }}>חודשיים</button>
-          </>;
-        })()}
+        <button style={dashMonths.length === 0 ? S.filterOn : S.filterOff} onClick={() => setDashMonths([])}>כל השנה</button>
         {Array.from({ length: 12 }, (_, i) => {
           const m = `${year}-${String(i + 1).padStart(2, "0")}`;
           const label = new Date(m + "-01").toLocaleDateString("he-IL", { month: "short" });
-          return <button key={m} style={dashMonth === m ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setDashMonth(dashMonth === m ? "" : m)}>{label}</button>;
+          const isActive = dashMonths.includes(m);
+          return <button key={m} style={isActive ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={(e) => toggleMonth(m, e.shiftKey)}>{label}</button>;
         })}
+        {dashMonths.length > 1 && <span style={{ fontSize: 10, color: "#475569", marginRight: 4 }}>({dashMonths.length} נבחרו)</span>}
       </div>
+      <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>Shift+לחיצה לבחירת כמה חודשים</div>
 
       {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8, marginBottom: 12 }}>
-        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>סה״כ הכנסות {dashMonth ? (dashMonth.includes(",") ? "חודשיים" : new Date(dashMonth + "-01").toLocaleDateString("he-IL", { month: "long" })) : year}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>סה״כ הוצאות {dashMonth ? (dashMonth.includes(",") ? "חודשיים" : new Date(dashMonth + "-01").toLocaleDateString("he-IL", { month: "long" })) : year}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: totalIncome - totalExpense >= 0 ? "#10B981" : "#EF4444" }}>₪{(totalIncome - totalExpense).toLocaleString()}</div><div style={S.statLbl}>מאזן {dashMonth ? (dashMonth.includes(",") ? "חודשיים" : new Date(dashMonth + "-01").toLocaleDateString("he-IL", { month: "long" })) : year}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>סה״כ הכנסות {periodLabel}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>סה״כ הוצאות {periodLabel}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: totalIncome - totalExpense >= 0 ? "#10B981" : "#EF4444" }}>₪{(totalIncome - totalExpense).toLocaleString()}</div><div style={S.statLbl}>מאזן {periodLabel}</div></div>
       </div>
 
       {/* Bar chart */}
@@ -1326,16 +1373,16 @@ function DashboardView() {
 
       {/* Pie charts */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-        <PieChart data={expenseHome} total={totalExpenseHome} title="הוצאות בית" />
-        <PieChart data={expenseBiz} total={totalExpenseBiz} title="הוצאות עסק" />
+        <PieChart data={expenseHome} total={totalExpenseHome} title="הוצאות בית" pieId="home" />
+        <PieChart data={expenseBiz} total={totalExpenseBiz} title="הוצאות עסק" pieId="biz" />
       </div>
       <div style={{ marginTop: 12 }}>
-        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות לפי מקור" />
+        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות לפי מקור" pieId="income" />
       </div>
 
       {/* VAT summary */}
       <div style={{ ...S.statCard, marginTop: 12 }}>
-        <div style={S.statLbl}>מע״מ — {year}</div>
+        <div style={S.statLbl}>מע״מ — {periodLabel}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8, marginTop: 6 }}>
           <div style={{ background: "#0F172A", borderRadius: 8, padding: 12 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: "#10B981" }}>₪{vatData.vatIncome.toLocaleString()}</div>
