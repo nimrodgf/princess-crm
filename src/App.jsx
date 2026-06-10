@@ -1419,17 +1419,18 @@ function DashboardView() {
       </div>
       <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>Shift+לחיצה לבחירת כמה חודשים</div>
 
-      {/* Account balances */}
+      {/* Account balances + credit + future planning */}
       {(() => {
         const openBiz = Number(localStorage.getItem("princess_opening_balance")) || 0;
         const openAfik = Number(localStorage.getItem("princess_opening_balance_afik")) || 0;
         const openShared = Number(localStorage.getItem("princess_opening_balance_shared")) || 0;
-        const sumActual = (filter) => merged.filter(filter).filter(t => !(t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט"))).reduce((s, t) => s + t.charged_amount, 0);
-        const balBiz = openBiz + sumActual(ACCOUNT_CONFIGS.biz.filter);
-        const balAfik = openAfik + sumActual(ACCOUNT_CONFIGS.afik.filter);
-        const balShared = openShared + sumActual(ACCOUNT_CONFIGS.shared.filter);
+        // Balance = bank transactions only (no individual card charges, they're reflected in bank debit lines)
+        const sumBank = (companyId, account) => merged.filter(t => t.company_id === companyId && (!account || t.account === account)).reduce((s, t) => s + t.charged_amount, 0);
+        const balBiz = openBiz + sumBank("otsarHahayal");
+        const balAfik = openAfik + sumBank("hapoalim", "327754");
+        const balShared = openShared + sumBank("hapoalim", "431928");
 
-        // Credit card totals (current period or all)
+        // Credit card totals (selected period)
         const creditFilter = (companyId) => {
           let txs = merged.filter(t => t.company_id === companyId);
           if (dashMonths.length > 0) txs = txs.filter(t => dashMonths.some(m => t.activity_date?.startsWith(m)));
@@ -1439,20 +1440,33 @@ function DashboardView() {
         const creditIsracard = creditFilter("isracard");
         const creditMax = creditFilter("max");
 
-        return (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+        // Future planning
+        const now = new Date();
+        const nextMonth = `${now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear()}-${String((now.getMonth() + 1) % 12 + 1).padStart(2, "0")}`;
+        const projections = generateRecurringProjections(recurringAll);
+        const futureManual = manualAll.filter(m => m.status === "planned" && m.date >= now.toISOString().slice(0, 10));
+        const nextMonthProj = projections.filter(p => p.date.startsWith(nextMonth));
+        const nextMonthManual = futureManual.filter(m => m.date?.startsWith(nextMonth));
+        const futureIncome = nextMonthProj.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0) + nextMonthManual.filter(m => m.type === "income").reduce((s, m) => s + m.amount, 0);
+        const futureExpense = Math.abs(nextMonthProj.filter(p => p.amount < 0).reduce((s, p) => s + p.amount, 0)) + nextMonthManual.filter(m => m.type === "expense").reduce((s, m) => s + m.amount, 0);
+        const currentTotal = balBiz + balAfik + balShared;
+        const expectedBalance = currentTotal + futureIncome - futureExpense;
+        const nextLabel = new Date(nextMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+
+        return (<>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 8 }}>
             <div style={{ ...S.statCard, borderRight: "3px solid #10B981" }}>
               <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש עסק — אוצר החייל</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: balBiz >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balBiz.toLocaleString()}</div>
               <div style={{ fontSize: 11, color: "#475569", marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
-                <span>💳 ישראכרט: </span><span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditIsracard.toLocaleString()}</span>
+                💳 ישראכרט: <span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditIsracard.toLocaleString()}</span>
               </div>
             </div>
             <div style={{ ...S.statCard, borderRight: "3px solid #3B82F6" }}>
               <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש פוקסי — הפועלים</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: balAfik >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balAfik.toLocaleString()}</div>
               <div style={{ fontSize: 11, color: "#475569", marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
-                <span>💳 מקס: </span><span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditMax.toLocaleString()}</span>
+                💳 מקס: <span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditMax.toLocaleString()}</span>
               </div>
             </div>
             <div style={{ ...S.statCard, borderRight: "3px solid #8B5CF6" }}>
@@ -1460,15 +1474,20 @@ function DashboardView() {
               <div style={{ fontSize: 22, fontWeight: 800, color: balShared >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balShared.toLocaleString()}</div>
             </div>
           </div>
-        );
-      })()}
 
-      {/* Income/Expense summary */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות {periodLabel}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות {periodLabel}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: totalIncome - totalExpense >= 0 ? "#10B981" : "#EF4444" }}>₪{(totalIncome - totalExpense).toLocaleString()}</div><div style={S.statLbl}>מאזן {periodLabel}</div></div>
-      </div>
+          {/* Future forecast - collapsed */}
+          <div style={{ marginBottom: 12 }}>
+            <button onClick={() => setShowFuture(!showFuture)} style={{ ...S.btn2, fontSize: 11, padding: "4px 12px" }}>{showFuture ? "▼" : "▶"} תחזית ל{nextLabel}</button>
+            {showFuture && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 6 }}>
+                <div style={{ ...S.statCard, textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#10B981" }}>₪{futureIncome.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הכנסות צפויות</div></div>
+                <div style={{ ...S.statCard, textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#EF4444" }}>₪{futureExpense.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הוצאות צפויות (כולל אשראי)</div></div>
+                <div style={{ ...S.statCard, textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: expectedBalance >= 0 ? "#10B981" : "#EF4444" }}>₪{expectedBalance.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>עו״ש צפוי כולל</div></div>
+              </div>
+            )}
+          </div>
+        </>);
+      })()}
 
       {/* Pie charts */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -1481,6 +1500,13 @@ function DashboardView() {
 
       {/* Bar chart */}
       <BarChart data={monthlyData} />
+
+      {/* Income/Expense/Balance summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12, marginBottom: 12 }}>
+        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות {periodLabel}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות {periodLabel}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: totalIncome - totalExpense >= 0 ? "#10B981" : "#EF4444" }}>₪{(totalIncome - totalExpense).toLocaleString()}</div><div style={S.statLbl}>מאזן {periodLabel}</div></div>
+      </div>
 
       {/* VAT summary */}
       <div style={{ ...S.statCard, marginTop: 12 }}>
@@ -1500,44 +1526,6 @@ function DashboardView() {
           </div>
         </div>
         <div style={{ fontSize: 10, color: "#475569", marginTop: 6 }}>* חישוב מבוסס על תנועות שסומנו "כולל מע״מ". מע״מ = 18%. רכב = שני שליש.</div>
-      </div>
-
-      {/* Future planning */}
-      <div style={{ marginTop: 12 }}>
-        <button onClick={() => setShowFuture(!showFuture)} style={{ ...S.btn2, fontSize: 12, padding: "6px 16px" }}>{showFuture ? "▼" : "▶"} תכנון עתידי</button>
-        {showFuture && (() => {
-          const now = new Date();
-          const nextMonth = `${now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear()}-${String((now.getMonth() + 1) % 12 + 1).padStart(2, "0")}`;
-          const projections = generateRecurringProjections(recurringAll);
-          const futureManual = manualAll.filter(m => m.status === "planned" && m.date >= now.toISOString().slice(0, 10));
-          const nextMonthProj = projections.filter(p => p.date.startsWith(nextMonth));
-          const nextMonthManual = futureManual.filter(m => m.date?.startsWith(nextMonth));
-
-          const futureIncome = nextMonthProj.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0) + nextMonthManual.filter(m => m.type === "income").reduce((s, m) => s + m.amount, 0);
-          const futureExpense = Math.abs(nextMonthProj.filter(p => p.amount < 0).reduce((s, p) => s + p.amount, 0)) + nextMonthManual.filter(m => m.type === "expense").reduce((s, m) => s + m.amount, 0);
-
-          const openBiz = Number(localStorage.getItem("princess_opening_balance")) || 0;
-          const openAfik = Number(localStorage.getItem("princess_opening_balance_afik")) || 0;
-          const openShared = Number(localStorage.getItem("princess_opening_balance_shared")) || 0;
-          const sumAll = merged.filter(t => !(t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט"))).reduce((s, t) => s + t.charged_amount, 0);
-          const currentTotal = openBiz + openAfik + openShared + sumAll;
-          const expectedTotal = currentTotal + futureIncome - futureExpense;
-
-          const nextLabel = new Date(nextMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
-          return (
-            <div style={{ ...S.statCard, marginTop: 8 }}>
-              <div style={S.statLbl}>תחזית ל{nextLabel}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
-                <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#10B981" }}>₪{futureIncome.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הכנסות צפויות</div></div>
-                <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#EF4444" }}>₪{futureExpense.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הוצאות צפויות</div></div>
-                <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: expectedTotal >= 0 ? "#10B981" : "#EF4444" }}>₪{expectedTotal.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>עו״ש צפוי כולל</div></div>
-              </div>
-              {nextMonthProj.length > 0 && <div style={{ marginTop: 8, fontSize: 11, color: "#64748B" }}>
-                {nextMonthProj.map((p, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span>{p.description}</span><span style={{ color: p.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr" }}>{p.amount > 0 ? "+" : ""}₪{p.amount.toLocaleString()}</span></div>)}
-              </div>}
-            </div>
-          );
-        })()}
       </div>
     </div>
   );
