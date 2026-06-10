@@ -164,8 +164,8 @@ tasks.filter(t=>!t.completed).forEach(t=>{const cr=new Date(t.created_at).getTim
 
 function NotifPanel({notifs,onClose,onSelect,onDismiss}){const dismiss=(n)=>{if(n.dismissKey){const d=JSON.parse(localStorage.getItem("princess_dismissed_notifs")||"{}");d[n.dismissKey]=new Date().toISOString();localStorage.setItem("princess_dismissed_notifs",JSON.stringify(d));}if(onDismiss)onDismiss();onSelect(n.leadId);onClose();};return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>🔔 התראות ({notifs.length})</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={{display:"flex",flexDirection:"column",gap:4}}>{notifs.map((n,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",background:"#0F172A",borderRadius:8,padding:"10px 12px",cursor:"pointer",borderRight:`3px solid ${n.type==="lead"?"#F59E0B":n.type==="frozen"?"#64748B":"#EF4444"}`}} onClick={()=>dismiss(n)}><span style={{fontSize:14}}>{n.type==="lead"?"⚠️":n.type==="frozen"?"❄️":"⏰"}</span><span style={{fontSize:13,flex:1}}>{n.text}</span>{n.dismissKey&&<span style={{fontSize:10,color:"#475569"}}>לחץ להשתקה לשבוע</span>}</div>)}{notifs.length===0&&<p style={S.empty}>אין התראות 🎉</p>}</div></Modal>);}
 
-const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר","העברות לאפיק/משותף"];
-const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תחזוקת רכב","דלק","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ ומיסים","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
+const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר","העברות לאפיק/משותף","דלק","תחזוקת רכב"];
+const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ ומיסים","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
 const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה","החזרים"];
 const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
 const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"gift",label:"מתנה"}];
@@ -193,8 +193,8 @@ const CAT_DEFAULTS = {
   "תוכנות": { domain: "biz", includes_vat: "לא", vat_deductible: "לא" },
   "שיווק": { domain: "biz", includes_vat: "לא", vat_deductible: "לא" },
   // עסק — רכב
-  "דלק": { domain: "biz", includes_vat: "כן", vat_deductible: "רכב" },
-  "תחזוקת רכב": { domain: "biz", includes_vat: "כן", vat_deductible: "רכב" },
+  "דלק": { domain: "home", includes_vat: "כן", vat_deductible: "רכב" },
+  "תחזוקת רכב": { domain: "home", includes_vat: "כן", vat_deductible: "רכב" },
   // עסק — לא מוכר
   "הלוואות וקרנות": { domain: "biz", includes_vat: "לא", vat_deductible: "לא" },
   "ריביות ועמלות": { domain: "biz", includes_vat: "לא", vat_deductible: "לא" },
@@ -1245,7 +1245,7 @@ function DashboardView() {
     });
     return (
       <div style={S.statCard}>
-        <div style={S.statLbl}>{title}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={S.statLbl}>{title}</div><div style={{ fontSize: 14, fontWeight: 700, color: "#E2E8F0", direction: "ltr" }}>₪{total.toLocaleString()}</div></div>
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ position: "relative", flexShrink: 0 }}>
             <svg viewBox="0 0 200 200" width="160" height="160">
@@ -1278,6 +1278,8 @@ function DashboardView() {
   function BarChart({ data }) {
     const [hover, setHover] = useState(null);
     const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1);
+    const totalBarIncome = data.reduce((s, d) => s + d.income, 0);
+    const totalBarExpense = data.reduce((s, d) => s + d.expense, 0);
     const barW = 30;
     const gap = 12;
     const chartW = data.length * (barW * 2 + gap) + 40;
@@ -1286,9 +1288,9 @@ function DashboardView() {
       <div style={S.statCard}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={S.statLbl}>הכנסות מול הוצאות — חודשי</div>
-          <div style={{ display: "flex", gap: 10, fontSize: 11 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#10B981" }} />הכנסות</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#EF4444" }} />הוצאות</span>
+          <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#10B981" }} />הכנסות <strong style={{ color: "#10B981", direction: "ltr" }}>₪{totalBarIncome.toLocaleString()}</strong></span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#EF4444" }} />הוצאות <strong style={{ color: "#EF4444", direction: "ltr" }}>₪{totalBarExpense.toLocaleString()}</strong></span>
           </div>
         </div>
         <div style={{ overflowX: "auto", marginTop: 8 }}>
