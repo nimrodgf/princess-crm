@@ -611,12 +611,17 @@ function CashflowView({ leads, accountId = "biz" }) {
   // Detect credit card debit lines from bank (ישראכרט lump sum)
   const isCardDebitFn = (t) => {
     const desc = (t.description || "").toLowerCase();
-    return (t.company_id === "otsarHahayal" || !t.company_id) &&
-      (desc.includes("ישראכרט") || desc.includes("isracard") || desc.includes("כרטיס אשראי"));
+    // Isracard debit from otsarHahayal
+    if ((t.company_id === "otsarHahayal") &&
+      (desc.includes("ישראכרט") || desc.includes("isracard") || desc.includes("כרטיס אשראי"))) return true;
+    // Max debit from hapoalim
+    if ((t.company_id === "hapoalim") &&
+      (desc.includes("מקס") || desc.includes("max") || desc.includes("לאומי קארד") || desc.includes("כרטיס אשראי"))) return true;
+    return false;
   };
 
   const autoPayMethod = (desc, companyId) => {
-    if (companyId === "isracard") return "אשראי";
+    if (companyId === "isracard" || companyId === "max") return "אשראי";
     const d = (desc || "").toLowerCase();
     if (d.includes("ביט") || d.includes("bit") || d.includes("מביט")) return "ביט";
     if (d.includes("paybox") || d.includes("פייבוקס") || d.includes("מפייבוקס")) return "פייבוקס";
@@ -634,7 +639,7 @@ function CashflowView({ leads, accountId = "biz" }) {
     txns.forEach(t => {
       const m = getMeta(t.unique_id);
       const cardDebit = isCardDebitFn(t);
-      const isCard = t.company_id === "isracard";
+      const isCard = t.company_id === "isracard" || t.company_id === "max";
       const savedCat = m.category || "";
       const autoCat = !savedCat ? autoCategory(t.description) : "";
       const effectiveCat = savedCat || autoCat;
@@ -684,28 +689,32 @@ function CashflowView({ leads, accountId = "biz" }) {
 
     // Future credit card summary lines — estimate upcoming bank debit
     const now = new Date();
-    const cardByMonth = {};
-    txns.filter(t => t.company_id === "isracard").forEach(t => {
-      const raw = typeof t.raw === "string" ? JSON.parse(t.raw || "{}") : (t.raw || {});
-      const chargeMonth = (raw.processedDate || t.activity_date || "").slice(0, 7);
-      if (!chargeMonth) return;
-      if (!cardByMonth[chargeMonth]) cardByMonth[chargeMonth] = 0;
-      cardByMonth[chargeMonth] += Math.abs(t.charged_amount);
-    });
-    // Only show for future months where bank hasn't debited yet
-    const bankCardDebits = new Set(txns.filter(t => isCardDebitFn(t)).map(t => t.activity_date?.slice(0, 7)));
-    Object.entries(cardByMonth).forEach(([mon, total]) => {
-      if (!bankCardDebits.has(mon)) {
-        rows.push({
-          _key: "card_summary_" + mon, _type: "card_summary",
-          _isCardSummary: true,
-          date: mon + "-01",
-          description: `💳 חיוב אשראי צפוי — ${new Date(mon + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}`,
-          amount: -total, // This DOES affect cashflow — it's the expected bank debit
-          _cardTotal: total,
-          domain: "", category: "הורדת אשראי", status: "עתידי"
-        });
-      }
+    const cardCompanies = [
+      { id: "isracard", label: "ישראכרט" },
+      { id: "max", label: "מקס" }
+    ];
+    const bankCardDebits = new Set(txns.filter(t => isCardDebitFn(t)).map(t => t.activity_date?.slice(0, 7) + "_" + (t.company_id === "otsarHahayal" ? "isracard" : "max")));
+    cardCompanies.forEach(cc => {
+      const cardByMonth = {};
+      txns.filter(t => t.company_id === cc.id).forEach(t => {
+        const raw = typeof t.raw === "string" ? JSON.parse(t.raw || "{}") : (t.raw || {});
+        const chargeMonth = (raw.processedDate || t.activity_date || "").slice(0, 7);
+        if (!chargeMonth) return;
+        if (!cardByMonth[chargeMonth]) cardByMonth[chargeMonth] = 0;
+        cardByMonth[chargeMonth] += Math.abs(t.charged_amount);
+      });
+      Object.entries(cardByMonth).forEach(([mon, total]) => {
+        if (!bankCardDebits.has(mon + "_" + cc.id)) {
+          rows.push({
+            _key: `card_summary_${cc.id}_${mon}`, _type: "card_summary",
+            _isCardSummary: true,
+            date: mon + "-01",
+            description: `💳 חיוב ${cc.label} צפוי — ${new Date(mon + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}`,
+            amount: -total,
+            _cardTotal: total,
+          });
+        }
+      });
     });
 
     // Sort ascending for running total calc
