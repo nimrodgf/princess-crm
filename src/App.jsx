@@ -304,6 +304,7 @@ function generateRecurringProjections(recurring) {
         projections.push({
           _type: "recurring",
           _recurringId: r.id,
+          _accountId: r.account_id || "biz",
           date: fmtLocal(d),
           description: r.description,
           amount: r.type === "expense" ? -Math.abs(r.amount) : Math.abs(r.amount),
@@ -1419,18 +1420,16 @@ function DashboardView() {
       </div>
       <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>Shift+לחיצה לבחירת כמה חודשים</div>
 
-      {/* Account balances + credit + future planning */}
+      {/* Account balances + credit + per-account forecast */}
       {(() => {
         const openBiz = Number(localStorage.getItem("princess_opening_balance")) || 0;
         const openAfik = Number(localStorage.getItem("princess_opening_balance_afik")) || 0;
         const openShared = Number(localStorage.getItem("princess_opening_balance_shared")) || 0;
-        // Balance = bank transactions only (no individual card charges, they're reflected in bank debit lines)
         const sumBank = (companyId, account) => merged.filter(t => t.company_id === companyId && (!account || t.account === account)).reduce((s, t) => s + t.charged_amount, 0);
         const balBiz = openBiz + sumBank("otsarHahayal");
         const balAfik = openAfik + sumBank("hapoalim", "327754");
         const balShared = openShared + sumBank("hapoalim", "431928");
 
-        // Credit card totals (selected period)
         const creditFilter = (companyId) => {
           let txs = merged.filter(t => t.company_id === companyId);
           if (dashMonths.length > 0) txs = txs.filter(t => dashMonths.some(m => t.activity_date?.startsWith(m)));
@@ -1440,51 +1439,52 @@ function DashboardView() {
         const creditIsracard = creditFilter("isracard");
         const creditMax = creditFilter("max");
 
-        // Future planning
+        // Future per account
         const now = new Date();
         const nextMonth = `${now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear()}-${String((now.getMonth() + 1) % 12 + 1).padStart(2, "0")}`;
         const projections = generateRecurringProjections(recurringAll);
         const futureManual = manualAll.filter(m => m.status === "planned" && m.date >= now.toISOString().slice(0, 10));
-        const nextMonthProj = projections.filter(p => p.date.startsWith(nextMonth));
-        const nextMonthManual = futureManual.filter(m => m.date?.startsWith(nextMonth));
-        const futureIncome = nextMonthProj.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0) + nextMonthManual.filter(m => m.type === "income").reduce((s, m) => s + m.amount, 0);
-        const futureExpense = Math.abs(nextMonthProj.filter(p => p.amount < 0).reduce((s, p) => s + p.amount, 0)) + nextMonthManual.filter(m => m.type === "expense").reduce((s, m) => s + m.amount, 0);
-        const currentTotal = balBiz + balAfik + balShared;
-        const expectedBalance = currentTotal + futureIncome - futureExpense;
-        const nextLabel = new Date(nextMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+        const nextLabel = new Date(nextMonth + "-01").toLocaleDateString("he-IL", { month: "short" });
+
+        const forecastForAcct = (acctId) => {
+          const recFiltered = projections.filter(p => (p._accountId || "biz") === acctId && p.date.startsWith(nextMonth));
+          const manFiltered = futureManual.filter(m => (m.account_id || "biz") === acctId && m.date?.startsWith(nextMonth));
+          const inc = recFiltered.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0) + manFiltered.filter(m => m.type === "income").reduce((s, m) => s + m.amount, 0);
+          const exp = Math.abs(recFiltered.filter(p => p.amount < 0).reduce((s, p) => s + p.amount, 0)) + manFiltered.filter(m => m.type === "expense").reduce((s, m) => s + m.amount, 0);
+          return { inc, exp };
+        };
+        const fBiz = forecastForAcct("biz");
+        const fAfik = forecastForAcct("afik");
+        const fShared = forecastForAcct("shared");
+
+        const AcctCard = ({ label, color, bal, credit, creditLabel, forecast, acctBal }) => (
+          <div style={{ ...S.statCard, borderRight: `3px solid ${color}` }}>
+            <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: bal >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{bal.toLocaleString()}</div>
+            {credit !== undefined && <div style={{ fontSize: 11, color: "#475569", marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
+              💳 {creditLabel}: <span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{credit.toLocaleString()}</span>
+            </div>}
+            {showFuture && <div style={{ marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
+              <div style={{ fontSize: 10, color: "#64748B", marginBottom: 4 }}>תחזית {nextLabel}:</div>
+              <div style={{ display: "flex", gap: 8, fontSize: 11 }}>
+                <span style={{ color: "#10B981" }}>+₪{forecast.inc.toLocaleString()}</span>
+                <span style={{ color: "#EF4444" }}>-₪{forecast.exp.toLocaleString()}</span>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: (acctBal + forecast.inc - forecast.exp) >= 0 ? "#10B981" : "#EF4444", marginTop: 2 }}>
+                צפי: ₪{(acctBal + forecast.inc - forecast.exp).toLocaleString()}
+              </div>
+            </div>}
+          </div>
+        );
 
         return (<>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 8 }}>
-            <div style={{ ...S.statCard, borderRight: "3px solid #10B981" }}>
-              <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש עסק — אוצר החייל</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: balBiz >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balBiz.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: "#475569", marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
-                💳 ישראכרט: <span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditIsracard.toLocaleString()}</span>
-              </div>
-            </div>
-            <div style={{ ...S.statCard, borderRight: "3px solid #3B82F6" }}>
-              <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש פוקסי — הפועלים</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: balAfik >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balAfik.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: "#475569", marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
-                💳 מקס: <span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditMax.toLocaleString()}</span>
-              </div>
-            </div>
-            <div style={{ ...S.statCard, borderRight: "3px solid #8B5CF6" }}>
-              <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש משותף — הפועלים</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: balShared >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balShared.toLocaleString()}</div>
-            </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+            <button onClick={() => setShowFuture(!showFuture)} style={{ ...S.btn2, fontSize: 11, padding: "3px 10px" }}>{showFuture ? "▼" : "▶"} תחזית {nextLabel}</button>
           </div>
-
-          {/* Future forecast - collapsed */}
-          <div style={{ marginBottom: 12 }}>
-            <button onClick={() => setShowFuture(!showFuture)} style={{ ...S.btn2, fontSize: 11, padding: "4px 12px" }}>{showFuture ? "▼" : "▶"} תחזית ל{nextLabel}</button>
-            {showFuture && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 6 }}>
-                <div style={{ ...S.statCard, textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#10B981" }}>₪{futureIncome.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הכנסות צפויות</div></div>
-                <div style={{ ...S.statCard, textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#EF4444" }}>₪{futureExpense.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הוצאות צפויות (כולל אשראי)</div></div>
-                <div style={{ ...S.statCard, textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: expectedBalance >= 0 ? "#10B981" : "#EF4444" }}>₪{expectedBalance.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>עו״ש צפוי כולל</div></div>
-              </div>
-            )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <AcctCard label="עו״ש עסק — אוצר החייל" color="#10B981" bal={balBiz} credit={creditIsracard} creditLabel="ישראכרט" forecast={fBiz} acctBal={balBiz} />
+            <AcctCard label="עו״ש פוקסי — הפועלים" color="#3B82F6" bal={balAfik} credit={creditMax} creditLabel="מקס" forecast={fAfik} acctBal={balAfik} />
+            <AcctCard label="עו״ש משותף — הפועלים" color="#8B5CF6" bal={balShared} forecast={fShared} acctBal={balShared} />
           </div>
         </>);
       })()}
