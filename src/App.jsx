@@ -6,7 +6,7 @@ const GCAL_URL = "https://script.google.com/macros/s/AKfycbyFyUmXAmlQCuZHgtAKu_0
 const hdrs = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" };
 async function sb(table, method = "GET", body = null, query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { method, headers: hdrs, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
 async function sbMoneyman(query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { headers: { ...hdrs, "Accept-Profile": "moneyman" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
-async function sbMoneymanWrite(method, query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { method, headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return true; }
+async function sbMoneymanWrite(method, query = "", body = null) { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { method, headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman" }, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return true; }
 async function addToCalendar(title, start, desc = "") { try { const r = await fetch(GCAL_URL, { method: "POST", body: JSON.stringify({ title, start, description: desc, duration: 30 }) }); return (await r.json()).success; } catch { return false; } }
 
 const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "frozen", label: "בהקפאה", color: "#64748B", bg: "#64748B15" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
@@ -831,6 +831,47 @@ function CashflowView({ leads, accountId = "biz" }) {
         <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14, background: incSrcF ? "#10B981" : "#1E293B", color: incSrcF ? "#fff" : "#64748B", border: "none" }} value={incSrcF} onChange={e => setIncSrcF(e.target.value)}><option value="">מקור הכנסה</option><option value="__none__">⚠ ללא מקור</option>{INCOME_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}</select>
         <div style={{ flex: 1 }} />
         <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
+        {(accountId === "afik" || accountId === "shared") && <><input type="file" id="xlUpload" accept=".xlsx,.xls" style={{ display: "none" }} onChange={async (e) => {
+          const file = e.target.files[0]; if (!file) return;
+          const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs");
+          const data = await file.arrayBuffer();
+          const wb = XLSX.read(data);
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          const acctRow = String(rows[3]?.[0] || "");
+          const parts = acctRow.split("-");
+          const acctNum = parts.length >= 3 ? parts[2]?.split(/\s/)[0] : "";
+          const expectedAcct = accountId === "afik" ? "327754" : "431928";
+          if (acctNum && acctNum !== expectedAcct) { _showToast(`חשבון לא תואם: ${acctNum} (צפוי ${expectedAcct})`, "error"); return; }
+          let added = 0;
+          const inserts = [];
+          for (let i = 5; i < rows.length; i++) {
+            const r = rows[i]; if (!r[0]) continue;
+            const dateRaw = r[0]; let dateStr;
+            if (typeof dateRaw === "number") { const d = new Date((dateRaw - 25569) * 86400000); dateStr = d.toISOString().slice(0, 10); }
+            else { const p = String(dateRaw).split(/[\/\.]/); dateStr = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; }
+            const action = String(r[1] || ""); const details = String(r[2] || ""); const ref = String(r[3] || "");
+            const debit = Number(r[4]) || 0; const credit = Number(r[5]) || 0;
+            const amount = credit - debit;
+            const beneficiary = String(r[8] || ""); const purpose = String(r[9] || "");
+            let desc = action; let memo = details !== "undefined" && details !== "nan" ? details : "";
+            if (purpose && purpose !== "undefined") memo = purpose;
+            if (beneficiary && beneficiary !== "undefined" && !desc.includes(beneficiary)) desc = `${action} - ${beneficiary}`;
+            const vdateRaw = r[7] || dateRaw; let vdate;
+            if (typeof vdateRaw === "number") { const d = new Date((vdateRaw - 25569) * 86400000); vdate = d.toISOString().slice(0, 10); }
+            else { const p = String(vdateRaw).split(/[\/\.]/); vdate = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; }
+            const uid = `${dateStr}_hapoalim_${expectedAcct}_${amount}_${ref}`;
+            inserts.push({ unique_id: uid, company_id: "hapoalim", account: expectedAcct, description: desc.trim(), memo: memo.trim(), original_currency: "ILS", original_amount: amount, charged_currency: "ILS", charged_amount: amount, activity_date: dateStr, process_date: vdate, status: "completed", scraped_by: "csv_import" });
+          }
+          let newCount = 0;
+          for (const ins of inserts) {
+            try { await sbMoneymanWrite("POST", "", ins); newCount++; } catch (e) { /* duplicate */ }
+          }
+          _showToast(`✓ ${newCount} תנועות חדשות מתוך ${inserts.length}`);
+          const freshTxns = await sbMoneyman("?order=activity_date.desc&limit=5000");
+          setTxns((freshTxns || []).filter(acctCfg.filter));
+          e.target.value = "";
+        }} /><button style={{ ...S.btn2, padding: "5px 12px", fontSize: 12 }} onClick={() => document.getElementById("xlUpload").click()}>📤 ייבוא אקסל</button></>}
       </div>
 
       {/* Transactions — Grid layout */}
@@ -1073,18 +1114,26 @@ function CashflowView({ leads, accountId = "biz" }) {
 function DashboardView() {
   const [txns, setTxns] = useState([]);
   const [meta, setMeta] = useState([]);
+  const [recurringAll, setRecurringAll] = useState([]);
+  const [manualAll, setManualAll] = useState([]);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [dashMonths, setDashMonths] = useState([]);
+  const [dashMonths, setDashMonths] = useState(() => {
+    const now = new Date();
+    return [`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`];
+  });
   const [dashAcct, setDashAcct] = useState("all");
   const [barHover, setBarHover] = useState(null);
   const [pieHover, setPieHover] = useState(null);
+  const [showFuture, setShowFuture] = useState(false);
 
   useEffect(() => {
     Promise.all([
       sbMoneyman("?order=activity_date.desc&limit=5000"),
       sb("transaction_meta", "GET", null, "?order=created_at.desc&limit=2000"),
-    ]).then(([t, m]) => { setTxns(t || []); setMeta(m || []); setLoading(false); }).catch(() => setLoading(false));
+      sb("recurring_transactions", "GET", null, "?is_active=eq.true&limit=200").catch(() => []),
+      sb("manual_transactions", "GET", null, "?order=date.desc&limit=500").catch(() => []),
+    ]).then(([t, m, rec, man]) => { setTxns(t || []); setMeta(m || []); setRecurringAll(rec || []); setManualAll(man || []); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
   const getMeta = (uid) => meta.find(m => m.unique_id === uid) || {};
@@ -1370,24 +1419,68 @@ function DashboardView() {
       </div>
       <div style={{ fontSize: 10, color: "#475569", marginBottom: 8 }}>Shift+לחיצה לבחירת כמה חודשים</div>
 
-      {/* Summary */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8, marginBottom: 12 }}>
-        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>סה״כ הכנסות {periodLabel}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>סה״כ הוצאות {periodLabel}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 28, fontWeight: 800, color: totalIncome - totalExpense >= 0 ? "#10B981" : "#EF4444" }}>₪{(totalIncome - totalExpense).toLocaleString()}</div><div style={S.statLbl}>מאזן {periodLabel}</div></div>
+      {/* Account balances */}
+      {(() => {
+        const openBiz = Number(localStorage.getItem("princess_opening_balance")) || 0;
+        const openAfik = Number(localStorage.getItem("princess_opening_balance_afik")) || 0;
+        const openShared = Number(localStorage.getItem("princess_opening_balance_shared")) || 0;
+        const sumActual = (filter) => merged.filter(filter).filter(t => !(t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט"))).reduce((s, t) => s + t.charged_amount, 0);
+        const balBiz = openBiz + sumActual(ACCOUNT_CONFIGS.biz.filter);
+        const balAfik = openAfik + sumActual(ACCOUNT_CONFIGS.afik.filter);
+        const balShared = openShared + sumActual(ACCOUNT_CONFIGS.shared.filter);
+
+        // Credit card totals (current period or all)
+        const creditFilter = (companyId) => {
+          let txs = merged.filter(t => t.company_id === companyId);
+          if (dashMonths.length > 0) txs = txs.filter(t => dashMonths.some(m => t.activity_date?.startsWith(m)));
+          else txs = txs.filter(t => t.activity_date?.startsWith(String(year)));
+          return Math.abs(txs.filter(t => t.charged_amount < 0).reduce((s, t) => s + t.charged_amount, 0));
+        };
+        const creditIsracard = creditFilter("isracard");
+        const creditMax = creditFilter("max");
+
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div style={{ ...S.statCard, borderRight: "3px solid #10B981" }}>
+              <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש עסק — אוצר החייל</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: balBiz >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balBiz.toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
+                <span>💳 ישראכרט: </span><span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditIsracard.toLocaleString()}</span>
+              </div>
+            </div>
+            <div style={{ ...S.statCard, borderRight: "3px solid #3B82F6" }}>
+              <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש פוקסי — הפועלים</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: balAfik >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balAfik.toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 6, borderTop: "1px solid #1E293B", paddingTop: 6 }}>
+                <span>💳 מקס: </span><span style={{ color: "#F59E0B", fontWeight: 600 }}>₪{creditMax.toLocaleString()}</span>
+              </div>
+            </div>
+            <div style={{ ...S.statCard, borderRight: "3px solid #8B5CF6" }}>
+              <div style={{ fontSize: 11, color: "#64748B", marginBottom: 4 }}>עו״ש משותף — הפועלים</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: balShared >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{balShared.toLocaleString()}</div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Income/Expense summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות {periodLabel}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות {periodLabel}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 20, fontWeight: 800, color: totalIncome - totalExpense >= 0 ? "#10B981" : "#EF4444" }}>₪{(totalIncome - totalExpense).toLocaleString()}</div><div style={S.statLbl}>מאזן {periodLabel}</div></div>
+      </div>
+
+      {/* Pie charts */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <PieChart data={expenseHome} total={totalExpenseHome} title="הוצאות בית" pieId="home" />
+        <PieChart data={expenseBiz} total={totalExpenseBiz} title="הוצאות עסק" pieId="biz" />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות לפי מקור" pieId="income" />
       </div>
 
       {/* Bar chart */}
       <BarChart data={monthlyData} />
-
-      {/* Pie charts */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-        <PieChart data={expenseHome} total={totalExpenseHome} title="הוצאות בית" pieId="home" />
-        <PieChart data={expenseBiz} total={totalExpenseBiz} title="הוצאות עסק" pieId="biz" />
-      </div>
-      <div style={{ marginTop: 12 }}>
-        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות לפי מקור" pieId="income" />
-      </div>
 
       {/* VAT summary */}
       <div style={{ ...S.statCard, marginTop: 12 }}>
@@ -1407,6 +1500,44 @@ function DashboardView() {
           </div>
         </div>
         <div style={{ fontSize: 10, color: "#475569", marginTop: 6 }}>* חישוב מבוסס על תנועות שסומנו "כולל מע״מ". מע״מ = 18%. רכב = שני שליש.</div>
+      </div>
+
+      {/* Future planning */}
+      <div style={{ marginTop: 12 }}>
+        <button onClick={() => setShowFuture(!showFuture)} style={{ ...S.btn2, fontSize: 12, padding: "6px 16px" }}>{showFuture ? "▼" : "▶"} תכנון עתידי</button>
+        {showFuture && (() => {
+          const now = new Date();
+          const nextMonth = `${now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear()}-${String((now.getMonth() + 1) % 12 + 1).padStart(2, "0")}`;
+          const projections = generateRecurringProjections(recurringAll);
+          const futureManual = manualAll.filter(m => m.status === "planned" && m.date >= now.toISOString().slice(0, 10));
+          const nextMonthProj = projections.filter(p => p.date.startsWith(nextMonth));
+          const nextMonthManual = futureManual.filter(m => m.date?.startsWith(nextMonth));
+
+          const futureIncome = nextMonthProj.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0) + nextMonthManual.filter(m => m.type === "income").reduce((s, m) => s + m.amount, 0);
+          const futureExpense = Math.abs(nextMonthProj.filter(p => p.amount < 0).reduce((s, p) => s + p.amount, 0)) + nextMonthManual.filter(m => m.type === "expense").reduce((s, m) => s + m.amount, 0);
+
+          const openBiz = Number(localStorage.getItem("princess_opening_balance")) || 0;
+          const openAfik = Number(localStorage.getItem("princess_opening_balance_afik")) || 0;
+          const openShared = Number(localStorage.getItem("princess_opening_balance_shared")) || 0;
+          const sumAll = merged.filter(t => !(t.company_id === "otsarHahayal" && (t.description || "").includes("ישראכרט"))).reduce((s, t) => s + t.charged_amount, 0);
+          const currentTotal = openBiz + openAfik + openShared + sumAll;
+          const expectedTotal = currentTotal + futureIncome - futureExpense;
+
+          const nextLabel = new Date(nextMonth + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+          return (
+            <div style={{ ...S.statCard, marginTop: 8 }}>
+              <div style={S.statLbl}>תחזית ל{nextLabel}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+                <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#10B981" }}>₪{futureIncome.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הכנסות צפויות</div></div>
+                <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: "#EF4444" }}>₪{futureExpense.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>הוצאות צפויות</div></div>
+                <div style={{ textAlign: "center" }}><div style={{ fontSize: 16, fontWeight: 700, color: expectedTotal >= 0 ? "#10B981" : "#EF4444" }}>₪{expectedTotal.toLocaleString()}</div><div style={{ fontSize: 10, color: "#64748B" }}>עו״ש צפוי כולל</div></div>
+              </div>
+              {nextMonthProj.length > 0 && <div style={{ marginTop: 8, fontSize: 11, color: "#64748B" }}>
+                {nextMonthProj.map((p, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span>{p.description}</span><span style={{ color: p.amount > 0 ? "#10B981" : "#EF4444", direction: "ltr" }}>{p.amount > 0 ? "+" : ""}₪{p.amount.toLocaleString()}</span></div>)}
+              </div>}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -1454,7 +1585,7 @@ export default function App(){
   const switchSection = (s) => {
     setSection(s);
     if (s === "crm") setView("leads");
-    else setView("cashflow_biz");
+    else setView("dashboard");
   };
 
   const CRM_TABS = [
@@ -1464,10 +1595,10 @@ export default function App(){
     { id: "stats", label: "נתונים" },
   ];
   const FIN_TABS = [
+    { id: "dashboard", label: "דאשבורד" },
     { id: "cashflow_biz", label: "תזרים עסק" },
     { id: "cashflow_afik", label: "תזרים פוקסי" },
     { id: "cashflow_shared", label: "תזרים משותף" },
-    { id: "dashboard", label: "דאשבורד" },
   ];
   const activeTabs = section === "crm" ? CRM_TABS : FIN_TABS;
 
