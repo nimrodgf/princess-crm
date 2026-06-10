@@ -834,43 +834,54 @@ function CashflowView({ leads, accountId = "biz" }) {
         <button style={{ ...S.btn1, padding: "5px 12px", fontSize: 12 }} onClick={() => setShowManualForm(true)}>{I.plus} תנועה ידנית</button>
         {(accountId === "afik" || accountId === "shared") && <><input type="file" id="xlUpload" accept=".xlsx,.xls" style={{ display: "none" }} onChange={async (e) => {
           const file = e.target.files[0]; if (!file) return;
-          const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs");
-          const data = await file.arrayBuffer();
-          const wb = XLSX.read(data);
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          const acctRow = String(rows[3]?.[0] || "");
-          const parts = acctRow.split("-");
-          const acctNum = parts.length >= 3 ? parts[2]?.split(/\s/)[0] : "";
-          const expectedAcct = accountId === "afik" ? "327754" : "431928";
-          if (acctNum && acctNum !== expectedAcct) { _showToast(`חשבון לא תואם: ${acctNum} (צפוי ${expectedAcct})`, "error"); return; }
-          let added = 0;
-          const inserts = [];
-          for (let i = 5; i < rows.length; i++) {
-            const r = rows[i]; if (!r[0]) continue;
-            const dateRaw = r[0]; let dateStr;
-            if (typeof dateRaw === "number") { const d = new Date((dateRaw - 25569) * 86400000); dateStr = d.toISOString().slice(0, 10); }
-            else { const p = String(dateRaw).split(/[\/\.]/); dateStr = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; }
-            const action = String(r[1] || ""); const details = String(r[2] || ""); const ref = String(r[3] || "");
-            const debit = Number(r[4]) || 0; const credit = Number(r[5]) || 0;
-            const amount = credit - debit;
-            const beneficiary = String(r[8] || ""); const purpose = String(r[9] || "");
-            let desc = action; let memo = details !== "undefined" && details !== "nan" ? details : "";
-            if (purpose && purpose !== "undefined") memo = purpose;
-            if (beneficiary && beneficiary !== "undefined" && !desc.includes(beneficiary)) desc = `${action} - ${beneficiary}`;
-            const vdateRaw = r[7] || dateRaw; let vdate;
-            if (typeof vdateRaw === "number") { const d = new Date((vdateRaw - 25569) * 86400000); vdate = d.toISOString().slice(0, 10); }
-            else { const p = String(vdateRaw).split(/[\/\.]/); vdate = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; }
-            const uid = `${dateStr}_hapoalim_${expectedAcct}_${amount}_${ref}`;
-            inserts.push({ unique_id: uid, company_id: "hapoalim", account: expectedAcct, description: desc.trim(), memo: memo.trim(), original_currency: "ILS", original_amount: amount, charged_currency: "ILS", charged_amount: amount, activity_date: dateStr, process_date: vdate, status: "completed", scraped_by: "csv_import" });
+          _showToast("📤 מייבא...");
+          try {
+            const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs");
+            const data = await file.arrayBuffer();
+            const wb = XLSX.read(data);
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+            const acctRow = String(rows[3]?.[0] || "");
+            const parts = acctRow.split("-");
+            const acctNum = parts.length >= 3 ? parts[2]?.split(/\s/)[0] : "";
+            const expectedAcct = accountId === "afik" ? "327754" : "431928";
+            if (acctNum && acctNum !== expectedAcct) { _showToast(`חשבון לא תואם: ${acctNum} (צפוי ${expectedAcct})`, "error"); e.target.value = ""; return; }
+            const inserts = [];
+            for (let i = 5; i < rows.length; i++) {
+              const r = rows[i]; if (!r[0]) continue;
+              const dateRaw = r[0]; let dateStr;
+              if (typeof dateRaw === "number") { const d = new Date((dateRaw - 25569) * 86400000); dateStr = d.toISOString().slice(0, 10); }
+              else { const p = String(dateRaw).split(/[\/\.]/); dateStr = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; }
+              const action = String(r[1] || ""); const details = String(r[2] || ""); const ref = String(r[3] || "");
+              const debit = Number(r[4]) || 0; const credit = Number(r[5]) || 0;
+              const amount = credit - debit;
+              const beneficiary = String(r[8] || ""); const purpose = String(r[9] || "");
+              let desc = action; let memo = details !== "undefined" && details !== "nan" ? details : "";
+              if (purpose && purpose !== "undefined") memo = purpose;
+              if (beneficiary && beneficiary !== "undefined" && !desc.includes(beneficiary)) desc = `${action} - ${beneficiary}`;
+              const vdateRaw = r[7] || dateRaw; let vdate;
+              if (typeof vdateRaw === "number") { const d = new Date((vdateRaw - 25569) * 86400000); vdate = d.toISOString().slice(0, 10); }
+              else { const p = String(vdateRaw).split(/[\/\.]/); vdate = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; }
+              const uid = `${dateStr}_hapoalim_${expectedAcct}_${amount}_${ref}`;
+              inserts.push({ unique_id: uid, company_id: "hapoalim", account: expectedAcct, description: desc.trim(), memo: memo.trim(), original_currency: "ILS", original_amount: amount, charged_currency: "ILS", charged_amount: amount, activity_date: dateStr, process_date: vdate, status: "completed", scraped_by: "csv_import" });
+            }
+            if (inserts.length === 0) { _showToast("לא נמצאו תנועות בקובץ", "error"); e.target.value = ""; return; }
+            // Bulk insert with duplicate ignore
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions`, {
+              method: "POST",
+              headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman", "Prefer": "return=representation,resolution=ignore-duplicates" },
+              body: JSON.stringify(inserts)
+            });
+            if (!res.ok) { const err = await res.text(); _showToast("שגיאה: " + err.slice(0, 100), "error"); e.target.value = ""; return; }
+            const inserted = await res.json();
+            const newCount = inserted.length;
+            const dupes = inserts.length - newCount;
+            _showToast(`✓ ${newCount} תנועות חדשות נוספו${dupes > 0 ? ` (${dupes} כפילויות דולגו)` : ""}`);
+            const freshTxns = await sbMoneyman("?order=activity_date.desc&limit=5000");
+            setTxns((freshTxns || []).filter(acctCfg.filter));
+          } catch (err) {
+            _showToast("שגיאה: " + err.message, "error");
           }
-          let newCount = 0;
-          for (const ins of inserts) {
-            try { await sbMoneymanWrite("POST", "", ins); newCount++; } catch (e) { /* duplicate */ }
-          }
-          _showToast(`✓ ${newCount} תנועות חדשות מתוך ${inserts.length}`);
-          const freshTxns = await sbMoneyman("?order=activity_date.desc&limit=5000");
-          setTxns((freshTxns || []).filter(acctCfg.filter));
           e.target.value = "";
         }} /><button style={{ ...S.btn2, padding: "5px 12px", fontSize: 12 }} onClick={() => document.getElementById("xlUpload").click()}>📤 ייבוא אקסל</button></>}
       </div>
