@@ -766,6 +766,14 @@ function CashflowView({ leads, accountId = "biz" }) {
   if (loading) return <div style={S.empty}>טוען תנועות...</div>;
   return (
     <div style={{ padding: "8px 0 20px" }}>
+      {/* DEBUG — remove after fixing */}
+      <div style={{ background: "#EF444420", padding: 8, borderRadius: 8, fontSize: 11, marginBottom: 8, direction: "ltr" }}>
+        DEBUG: txns={txns.length}, sum={txns.reduce((s,t) => s + t.charged_amount, 0).toFixed(2)}, 
+        companies={[...new Set(txns.map(t=>t.company_id))].join(",")}, 
+        accounts={[...new Set(txns.map(t=>t.account))].join(",")},
+        opening={currentBalance}
+      </div>
+
       {/* Summary cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
         <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות{inclFuture ? " (כולל עתידי)" : ""}</div></div>
