@@ -502,7 +502,7 @@ function RecurringManager({ recurring, onAdd, onUpdate, onDelete, onAction }) {
 
 const ACCOUNT_CONFIGS = {
   biz: { label: "תזרים עסק", balanceKey: "princess_opening_balance", filter: t => t.company_id === "otsarHahayal" || t.company_id === "isracard" },
-  afik: { label: "תזרים פוקסי", balanceKey: "princess_opening_balance_afik", filter: t => (t.company_id === "hapoalim" && t.account === "327754") || t.company_id === "max" },
+  afik: { label: "תזרים פוקסי", balanceKey: "princess_opening_balance_afik", filter: t => t.company_id === "hapoalim" && t.account === "327754" },
   shared: { label: "תזרים משותף", balanceKey: "princess_opening_balance_shared", filter: t => t.company_id === "hapoalim" && t.account === "431928" },
 };
 
