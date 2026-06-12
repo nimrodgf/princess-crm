@@ -11,8 +11,8 @@ async function addToCalendar(title, start, desc = "") { try { const r = await fe
 
 const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "frozen", label: "בהקפאה", color: "#64748B", bg: "#64748B15" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
 const BOARD_STATUSES = STATUSES.filter(s => s.id !== "new");
-const SERVICES = ["הקלטה", "מיקס", "הפקה", "הפקה - אפיק", "לייב סשן", "פודקאסטים", "צילום קורס", "השכרת חלל", "בית ריק", "ייעוץ אומנותי - נימשי", "ייעוץ אומנותי - אפיק", "אחר"];
-const SOURCES = ["אינסטגרם", "המלצה", "גוגל", "פייסבוק", "אתר", "שיווק אקטיבי", "ממומן - מטא", "הכירות קודמת", "חוזר/ת", "אחר"];
+const SERVICES = ["בית ריק","הפקה","הפקה - אפיק","הקלטה","השכרת חלל","ייעוץ אומנותי - אפיק","ייעוץ אומנותי - נימשי","לייב סשן","מיקס","פודקאסטים","צילום קורס","אחר"];
+const SOURCES = ["אינסטגרם","אתר","גוגל","הכירות קודמת","המלצה","חוזר/ת","ממומן - מטא","פייסבוק","שיווק אקטיבי","אחר"];
 const TASK_TYPES = [{ id: "followup", label: "פולואפ", icon: "📞" }, { id: "call", label: "שיחה", icon: "☎️" }, { id: "prep", label: "הכנת חומרים", icon: "📦" }, { id: "export", label: "ייצוא", icon: "📤" }, { id: "other", label: "אחר", icon: "📌" }];
 const INTERACTION_TYPES = [{ id: "call", label: "שיחה" }, { id: "followup", label: "פולואפ" }, { id: "meeting", label: "פגישה" }, { id: "quote", label: "הצעת מחיר" }, { id: "note", label: "הערה" }];
 const TEMPS = [{ id: "hot", label: "חם", color: "#EF4444", emoji: "🔥" }, { id: "warm", label: "פושר", color: "#F59E0B", emoji: "🌤" }, { id: "cold", label: "קר", color: "#06B6D4", emoji: "❄️" }];
@@ -164,11 +164,11 @@ tasks.filter(t=>!t.completed).forEach(t=>{const cr=new Date(t.created_at).getTim
 
 function NotifPanel({notifs,onClose,onSelect,onDismiss}){const dismiss=(n)=>{if(n.dismissKey){const d=JSON.parse(localStorage.getItem("princess_dismissed_notifs")||"{}");d[n.dismissKey]=new Date().toISOString();localStorage.setItem("princess_dismissed_notifs",JSON.stringify(d));}if(onDismiss)onDismiss();onSelect(n.leadId);onClose();};return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>🔔 התראות ({notifs.length})</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={{display:"flex",flexDirection:"column",gap:4}}>{notifs.map((n,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",background:"#0F172A",borderRadius:8,padding:"10px 12px",cursor:"pointer",borderRight:`3px solid ${n.type==="lead"?"#F59E0B":n.type==="frozen"?"#64748B":"#EF4444"}`}} onClick={()=>dismiss(n)}><span style={{fontSize:14}}>{n.type==="lead"?"⚠️":n.type==="frozen"?"❄️":"⏰"}</span><span style={{fontSize:13,flex:1}}>{n.text}</span>{n.dismissKey&&<span style={{fontSize:10,color:"#475569"}}>לחץ להשתקה לשבוע</span>}</div>)}{notifs.length===0&&<p style={S.empty}>אין התראות 🎉</p>}</div></Modal>);}
 
-const EXPENSE_CATS_HOME=["מזון","אוכל בחוץ","ביטוחים","פארם","משתנות","שכד","חשבונות בית","טיפול","כושר","העברות לאפיק/משותף","דלק","תחזוקת רכב"];
-const EXPENSE_CATS_BIZ=["שכד אולפן","הלוואות וקרנות","תוכנות","ספקים","ציוד","הורדת אשראי","ריביות ועמלות","מעמ ומיסים","חשבונות עסק","שיווק","תחבצ וחניונים","לא תזרימי","אחר"];
+const EXPENSE_CATS_HOME=["אוכל בחוץ","ביטוחים","דלק","העברות לאפיק/משותף","חשבונות בית","טיפול","כושר","מזון","משתנות","פארם","שכד","תחזוקת רכב"];
+const EXPENSE_CATS_BIZ=["הורדת אשראי","הלוואות וקרנות","חשבונות עסק","לא תזרימי","מעמ ומיסים","ספקים","ציוד","ריביות ועמלות","שיווק","שכד אולפן","תוכנות","תחבצ וחניונים","אחר"];
 const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה","החזרים"];
 const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
-const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"gift",label:"מתנה"}];
+const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"gift",label:"מתנה"},{id:"foxy",label:"פוקסי"}];
 
 // Category → auto domain + VAT defaults
 const CAT_DEFAULTS = {
@@ -210,8 +210,8 @@ const CAT_DEFAULTS = {
   "מתנה": { domain: "gift", includes_vat: "לא", vat_deductible: "", income_source: "מתנה" },
   "החזרים": { domain: "biz", includes_vat: "לא", vat_deductible: "", income_source: "החזרים" },
 };
-const INCOME_SOURCES=["הקלטה","מיקס","הפקה","הפקה - אפיק","לייב סשן","פודקאסטים","צילום קורס","השכרת חלל","בית ריק","ייעוץ אומנותי - נימשי","ייעוץ אומנותי - אפיק","בקליין","הופעות","שוכרי משנה","מיקסים","תמלוגים","מתנה","הלוואה","החזרים","אחר"];
-const PAY_METHODS=["אשראי","העברה","מזומן","הוראת קבע","ביט","פייבוקס","אחר"];
+const INCOME_SOURCES=["בית ריק","בקליין","הופעות","החזרים","הלוואה","הפקה","הפקה - אפיק","הקלטה","השכרת חלל","ייעוץ אומנותי - אפיק","ייעוץ אומנותי - נימשי","לייב סשן","מיקס","מיקסים","מתנה","פודקאסטים","צילום קורס","שוכרי משנה","תמלוגים","אחר"];
+const PAY_METHODS=["אשראי","ביט","הוראת קבע","העברה","מזומן","פייבוקס","אחר"];
 const TXN_STATUSES=["שולם/התקבל","בחוב","עתידי"];
 
 // Auto-categorization: business name → category map
@@ -644,7 +644,8 @@ function CashflowView({ leads, accountId = "biz" }) {
       const autoCat = !savedCat ? autoCategory(t.description) : "";
       const effectiveCat = savedCat || autoCat;
       const catDef = CAT_DEFAULTS[effectiveCat];
-      const autoDomain = !m.domain && catDef ? catDef.domain : "";
+      const acctDomain = (t.company_id === "hapoalim" && t.account === "327754") ? "foxy" : (t.company_id === "hapoalim" && t.account === "431928") ? "home" : "";
+      const autoDomain = m.domain || (catDef ? catDef.domain : "") || acctDomain;
       rows.push({
         _key: "bank_" + t.unique_id, _type: "bank", _uid: t.unique_id,
         _isCardDebit: cardDebit, _isCard: isCard,
@@ -766,14 +767,6 @@ function CashflowView({ leads, accountId = "biz" }) {
   if (loading) return <div style={S.empty}>טוען תנועות...</div>;
   return (
     <div style={{ padding: "8px 0 20px" }}>
-      {/* DEBUG — remove after fixing */}
-      <div style={{ background: "#EF444420", padding: 8, borderRadius: 8, fontSize: 11, marginBottom: 8, direction: "ltr" }}>
-        DEBUG: txns={txns.length}, sum={txns.reduce((s,t) => s + t.charged_amount, 0).toFixed(2)}, 
-        companies={[...new Set(txns.map(t=>t.company_id))].join(",")}, 
-        accounts={[...new Set(txns.map(t=>t.account))].join(",")},
-        opening={currentBalance}
-      </div>
-
       {/* Summary cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
         <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות{inclFuture ? " (כולל עתידי)" : ""}</div></div>
@@ -1275,6 +1268,16 @@ function DashboardView() {
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [yearTxns]);
 
+  const incomeFoxy = useMemo(() => {
+    const cats = {};
+    yearTxns.filter(t => t.charged_amount > 0 && (t.domain === "foxy" || (t.company_id === "hapoalim" && t.account === "327754"))).forEach(t => {
+      let label = t.income_source || t.category || "ללא מקור";
+      cats[label] = (cats[label] || 0) + t.charged_amount;
+    });
+    return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [yearTxns]);
+  const totalIncomeFoxy = incomeFoxy.reduce((s, [, v]) => s + v, 0);
+
   const PIE_COLORS = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#06B6D4", "#EC4899", "#F97316", "#84CC16", "#6366F1"];
 
   const totalExpense = expenseByCat.reduce((s, [, v]) => s + v, 0);
@@ -1522,8 +1525,9 @@ function DashboardView() {
         <PieChart data={expenseHome} total={totalExpenseHome} title="הוצאות בית" pieId="home" />
         <PieChart data={expenseBiz} total={totalExpenseBiz} title="הוצאות עסק" pieId="biz" />
       </div>
-      <div style={{ marginBottom: 12 }}>
-        <PieChart data={incomeByCat} total={totalIncome} title="פילוג הכנסות לפי מקור" pieId="income" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <PieChart data={incomeByCat} total={totalIncome} title="הכנסות עסק לפי מקור" pieId="income" />
+        <PieChart data={incomeFoxy} total={totalIncomeFoxy} title="הכנסות פוקסי" pieId="incomeFoxy" />
       </div>
 
       {/* Bar chart */}
