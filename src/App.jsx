@@ -800,6 +800,13 @@ function CashflowView({ leads, accountId = "biz" }) {
         </div>
       )}
 
+      {/* Income/Expense/Balance — single line */}
+      <div style={{ display: "flex", gap: 16, padding: "6px 14px", marginBottom: 8, fontSize: 13 }}>
+        <span>הכנסות: <strong style={{ color: "#10B981" }}>₪{totalIncome.toLocaleString()}</strong></span>
+        <span>הוצאות: <strong style={{ color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</strong></span>
+        <span>מאזן: <strong style={{ color: balance >= 0 ? "#10B981" : "#EF4444" }}>₪{balance.toLocaleString()}</strong></span>
+      </div>
+
       {/* Match alerts */}
       {potentialMatches.length > 0 && !month && (
         <div style={{ ...S.statCard, marginBottom: 8, borderRight: "3px solid #F59E0B" }}>
@@ -847,13 +854,6 @@ function CashflowView({ leads, accountId = "biz" }) {
         })()}
       </div>
       <div style={{ fontSize: 10, color: "#334155", marginBottom: 6 }}>Shift+לחיצה לבחירת כמה חודשים</div>
-
-      {/* Income/Expense/Balance summary */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
-        <div style={S.statCard}><div style={{ fontSize: 18, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 18, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 18, fontWeight: 800, color: balance >= 0 ? "#10B981" : "#EF4444" }}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
-      </div>
 
       {/* Type/category filters */}
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
