@@ -767,38 +767,42 @@ function CashflowView({ leads, accountId = "biz" }) {
   if (loading) return <div style={S.empty}>טוען תנועות...</div>;
   return (
     <div style={{ padding: "8px 0 20px" }}>
-      {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
-        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#10B981" }}>₪{totalIncome.toLocaleString()}</div><div style={S.statLbl}>הכנסות{inclFuture ? " (כולל עתידי)" : ""}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: "#EF4444" }}>₪{totalExpense.toLocaleString()}</div><div style={S.statLbl}>הוצאות{inclFuture ? " (כולל עתידי)" : ""}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 22, fontWeight: 800, color: balance >= 0 ? "#10B981" : "#EF4444" }}>₪{balance.toLocaleString()}</div><div style={S.statLbl}>מאזן</div></div>
-      </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-        <label style={{ fontSize: 11, color: "#64748B", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}><input type="checkbox" checked={inclFuture} onChange={e => setInclFuture(e.target.checked)} /> כולל עתידי</label>
-        <span style={{ flex: 1 }} />
-        {currentBalance !== null ? (
-          <span style={{ fontSize: 11, color: "#64748B", cursor: "pointer" }} onClick={() => setShowBalanceEdit(true)}>יתרת פתיחה: <span style={{ color: "#3B82F6", fontWeight: 600 }}>₪{currentBalance.toLocaleString()}</span> ✎</span>
-        ) : (
-          <span style={{ fontSize: 11, color: "#F59E0B", cursor: "pointer" }} onClick={() => setShowBalanceEdit(true)}>⚠ הגדר יתרת פתיחה</span>
-        )}
-      </div>
+      {/* Current balance */}
+      {(() => {
+        const bankSum = unified.filter(t => !t._isNonCashflow && t._type === "bank").reduce((s, t) => s + t.amount, 0);
+        const curBal = (currentBalance || 0) + bankSum;
+        return <div style={{ ...S.statCard, borderRight: `3px solid ${accountId === "biz" ? "#10B981" : accountId === "afik" ? "#3B82F6" : "#8B5CF6"}`, marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#64748B" }}>עו״ש נוכחי — {acctCfg.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: curBal >= 0 ? "#E2E8F0" : "#EF4444" }}>₪{curBal.toLocaleString()}</div>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              {currentBalance !== null ? (
+                <span style={{ fontSize: 11, color: "#64748B", cursor: "pointer" }} onClick={() => setShowBalanceEdit(true)}>יתרת פתיחה: <span style={{ color: "#3B82F6" }}>₪{currentBalance.toLocaleString()}</span> ✎</span>
+              ) : (
+                <span style={{ fontSize: 11, color: "#F59E0B", cursor: "pointer" }} onClick={() => setShowBalanceEdit(true)}>⚠ הגדר יתרת פתיחה</span>
+              )}
+            </div>
+          </div>
+        </div>;
+      })()}
 
       {/* Balance editor */}
       {showBalanceEdit && (
-        <div style={{ ...S.statCard, marginBottom: 12, borderRight: "3px solid #3B82F6" }}>
+        <div style={{ ...S.statCard, marginBottom: 8, borderRight: "3px solid #3B82F6" }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>יתרה לפני התנועה הראשונה:</span>
             <input style={{ ...S.inp, width: 120, padding: "4px 8px", fontSize: 13 }} type="number" value={balanceInput} onChange={e => setBalanceInput(e.target.value)} placeholder="למשל: 18916" dir="ltr" autoFocus onKeyDown={e => { if (e.key === "Enter" && balanceInput) { const val = Number(balanceInput); setCurrentBalance(val); localStorage.setItem(acctCfg.balanceKey, String(val)); setShowBalanceEdit(false); setBalanceInput(""); _showToast("✓ יתרה עודכנה"); }}} />
             <button style={{ ...S.btn1, padding: "4px 12px", fontSize: 12 }} onClick={() => { if (!balanceInput) return; const val = Number(balanceInput); setCurrentBalance(val); localStorage.setItem(acctCfg.balanceKey, String(val)); setShowBalanceEdit(false); setBalanceInput(""); _showToast("✓ יתרה עודכנה"); }}>שמור</button>
             <button style={{ ...S.btn2, padding: "4px 12px", fontSize: 12 }} onClick={() => setShowBalanceEdit(false)}>ביטול</button>
           </div>
-          <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>הזן את היתרה בחשבון לפני התנועה הראשונה. התזרים יחושב קדימה מנקודה זו.</div>
         </div>
       )}
 
       {/* Match alerts */}
       {potentialMatches.length > 0 && !month && (
-        <div style={{ ...S.statCard, marginBottom: 12, borderRight: "3px solid #F59E0B" }}>
+        <div style={{ ...S.statCard, marginBottom: 8, borderRight: "3px solid #F59E0B" }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#F59E0B", marginBottom: 4 }}>⚡ תנועות להתאמה ({potentialMatches.length})</div>
           {potentialMatches.map((m, i) => (
             <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, padding: "4px 0", borderTop: i > 0 ? "1px solid #1E293B" : "none" }}>
@@ -815,23 +819,36 @@ function CashflowView({ leads, accountId = "biz" }) {
       {/* Recurring manager */}
       <RecurringManager recurring={recurring.filter(r => (r.account_id || "biz") === accountId)} onAdd={addRecurring} onUpdate={updateRecurring} onDelete={deleteRecurring} onAction={(a) => setRecurringAction(a)} />
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}>
+      {/* Date filters — month buttons with shift multi-select */}
+      <div style={{ display: "flex", gap: 3, marginBottom: 4, flexWrap: "wrap", alignItems: "center" }}>
         {(() => {
-          const now = new Date();
-          const curMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-          const nextMonth = new Date(now.getFullYear(), now.getMonth()+1, 1);
-          const twoMonths = `${curMonth},${nextMonth.getFullYear()}-${String(nextMonth.getMonth()+1).padStart(2,"0")}`;
-          const curYear = String(now.getFullYear());
+          const curYear = String(new Date().getFullYear());
+          const selectedMonths = month.includes(",") ? month.split(",") : month.length === 7 ? [month] : [];
+          const toggleMonth = (m, shiftKey) => {
+            if (shiftKey) {
+              const cur = selectedMonths.includes(m) ? selectedMonths.filter(x => x !== m) : [...selectedMonths, m];
+              setMonth(cur.length ? cur.join(",") : curYear);
+            } else {
+              setMonth(selectedMonths.length === 1 && selectedMonths[0] === m ? curYear : m);
+            }
+          };
           return <>
             <button style={!month ? S.filterOn : S.filterOff} onClick={() => setMonth("")}>הכל</button>
-            <button style={month === curMonth ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setMonth(month === curMonth ? "" : curMonth)}>החודש</button>
-            <button style={month === twoMonths ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setMonth(month === twoMonths ? "" : twoMonths)}>חודשיים</button>
-            <button style={month === curYear ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setMonth(month === curYear ? "" : curYear)}>שנה נוכחית</button>
+            <button style={month === curYear ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setMonth(curYear)}>שנה נוכחית</button>
+            <span style={{ width: 1, height: 16, background: "#334155", margin: "0 2px" }} />
+            {Array.from({ length: 12 }, (_, i) => {
+              const m = `${curYear}-${String(i + 1).padStart(2, "0")}`;
+              const label = new Date(m + "-01").toLocaleDateString("he-IL", { month: "short" });
+              const isActive = selectedMonths.includes(m);
+              return <button key={m} style={isActive ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={(e) => toggleMonth(m, e.shiftKey)}>{label}</button>;
+            })}
+            {selectedMonths.length > 1 && <span style={{ fontSize: 10, color: "#475569" }}>({selectedMonths.length} נבחרו)</span>}
           </>;
         })()}
-        <select style={{ ...S.inp, width: "auto", padding: "4px 8px", fontSize: 12, borderRadius: 14 }} value={months.includes(month) ? month : ""} onChange={e => setMonth(e.target.value)}><option value="">חודש...</option>{months.map(m => <option key={m} value={m}>{new Date(m + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })}</option>)}</select>
       </div>
+      <div style={{ fontSize: 10, color: "#334155", marginBottom: 6 }}>Shift+לחיצה לבחירת כמה חודשים</div>
+
+      {/* Type/category filters */}
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
         <button style={!typeF ? S.filterOn : S.filterOff} onClick={() => setTypeF("")}>הכל</button>
         <button style={typeF === "income" ? { ...S.filterOn, background: "#10B981" } : S.filterOff} onClick={() => setTypeF(typeF === "income" ? "" : "income")}>הכנסות</button>
