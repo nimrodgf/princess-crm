@@ -571,7 +571,7 @@ function CashflowView({ leads, accountId = "biz" }) {
   };
 
   const addManual = async (data) => {
-    try { const [r] = await sb("manual_transactions", "POST", { ...data, account_id: accountId }); setManualTxns(p => [r, ...p]); _showToast("✓ תנועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
+    try { const status = accountId === "cash" ? "confirmed" : "planned"; const [r] = await sb("manual_transactions", "POST", { ...data, account_id: accountId, status }); setManualTxns(p => [r, ...p]); _showToast("✓ תנועה נוספה"); } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
   };
   const deleteManual = async (id) => {
     try { await sb("manual_transactions", "DELETE", null, `?id=eq.${id}`); setManualTxns(p => p.filter(m => m.id !== id)); _showToast("✓ נמחק"); } catch (e) { _showToast("שגיאה", "error"); }
@@ -757,7 +757,7 @@ function CashflowView({ leads, accountId = "biz" }) {
   });
 
   const [inclFuture, setInclFuture] = useState(false);
-  const actualTxns = filtered.filter(t => !t._isNonCashflow && t._type !== "recurring" && !(t._type === "manual" && t.status === "עתידי"));
+  const actualTxns = filtered.filter(t => !t._isNonCashflow && t._type !== "recurring" && !(accountId !== "cash" && t._type === "manual" && t.status === "עתידי"));
   const allTxns = filtered.filter(t => !t._isNonCashflow);
   const summaryTxns = inclFuture ? allTxns : actualTxns;
   const totalIncome = summaryTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
