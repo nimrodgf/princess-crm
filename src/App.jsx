@@ -772,7 +772,9 @@ function CashflowView({ leads, accountId = "biz" }) {
     <div style={{ padding: "8px 0 20px" }}>
       {/* Current balance */}
       {(() => {
-        const bankSum = unified.filter(t => !t._isNonCashflow && t._type === "bank").reduce((s, t) => s + t.amount, 0);
+        const bankSum = accountId === "cash"
+          ? unified.filter(t => t._type === "manual" && t.status !== "עתידי").reduce((s, t) => s + t.amount, 0)
+          : unified.filter(t => !t._isNonCashflow && t._type === "bank").reduce((s, t) => s + t.amount, 0);
         const curBal = (currentBalance || 0) + bankSum;
         return <div style={{ ...S.statCard, borderRight: `3px solid ${accountId === "biz" ? "#10B981" : accountId === "afik" ? "#3B82F6" : "#8B5CF6"}`, marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
