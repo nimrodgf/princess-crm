@@ -906,7 +906,7 @@ function CashflowView({ leads, accountId = "biz" }) {
             }
             if (inserts.length === 0) { _showToast("לא נמצאו תנועות בקובץ", "error"); e.target.value = ""; return; }
             // Bulk insert with duplicate ignore
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions`, {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?on_conflict=unique_id`, {
               method: "POST",
               headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman", "Prefer": "return=representation,resolution=ignore-duplicates" },
               body: JSON.stringify(inserts)
