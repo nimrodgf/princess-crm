@@ -504,7 +504,7 @@ function RecurringManager({ recurring, onAdd, onUpdate, onDelete, onAction }) {
 
 const ACCOUNT_CONFIGS = {
   biz: { label: "תזרים עסק", balanceKey: "princess_opening_balance", filter: t => t.company_id === "otsarHahayal" || t.company_id === "isracard" },
-  afik: { label: "תזרים פוקסי", balanceKey: "princess_opening_balance_afik", filter: t => t.company_id === "hapoalim" && t.account === "327754" },
+  afik: { label: "תזרים פוקסי", balanceKey: "princess_opening_balance_afik", filter: t => (t.company_id === "hapoalim" && t.account === "327754") || t.company_id === "max" },
   shared: { label: "תזרים משותף", balanceKey: "princess_opening_balance_shared", filter: t => t.company_id === "hapoalim" && t.account === "431928" },
   cash: { label: "תזרים מזומנים", balanceKey: "princess_opening_balance_cash", filter: () => false },
 };
@@ -906,19 +906,22 @@ function CashflowView({ leads, accountId = "biz" }) {
               inserts.push({ unique_id: uid, company_id: "hapoalim", account: expectedAcct, description: desc.trim(), memo: memo.trim(), original_currency: "ILS", original_amount: amount, charged_currency: "ILS", charged_amount: amount, activity_date: dateStr, process_date: vdate, status: "completed", scraped_by: "csv_import" });
             }
             if (inserts.length === 0) { _showToast("לא נמצאו תנועות בקובץ", "error"); e.target.value = ""; return; }
+            // Count before
+            const beforeTxns = await sbMoneyman(`?company_id=eq.hapoalim&account=eq.${expectedAcct}&select=unique_id&limit=5000`);
+            const beforeCount = (beforeTxns || []).length;
             // Bulk insert with duplicate ignore
             const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?on_conflict=unique_id`, {
               method: "POST",
-              headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman", "Prefer": "return=representation,resolution=ignore-duplicates" },
+              headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman", "Prefer": "resolution=ignore-duplicates" },
               body: JSON.stringify(inserts)
             });
             if (!res.ok) { const err = await res.text(); _showToast("שגיאה: " + err.slice(0, 100), "error"); e.target.value = ""; return; }
-            const inserted = await res.json();
-            const newCount = inserted.length;
-            const dupes = inserts.length - newCount;
-            _showToast(`✓ ${newCount} תנועות חדשות נוספו${dupes > 0 ? ` (${dupes} כפילויות דולגו)` : ""}`);
+            // Count after
             const freshTxns = await sbMoneyman("?order=activity_date.desc&limit=5000");
-            setTxns((freshTxns || []).filter(acctCfg.filter));
+            const afterFiltered = (freshTxns || []).filter(acctCfg.filter);
+            const newCount = afterFiltered.length - beforeCount;
+            setTxns(afterFiltered);
+            _showToast(`✓ ${newCount > 0 ? newCount + " תנועות חדשות נוספו" : "אין תנועות חדשות"}${newCount < inserts.length ? ` (${inserts.length - newCount} כפילויות דולגו)` : ""}`);
           } catch (err) {
             _showToast("שגיאה: " + err.message, "error");
           }
