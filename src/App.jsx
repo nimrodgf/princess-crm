@@ -652,7 +652,7 @@ function CashflowView({ leads, accountId = "biz" }) {
       rows.push({
         _key: "bank_" + t.unique_id, _type: "bank", _uid: t.unique_id,
         _isCardDebit: cardDebit, _isCard: isCard,
-        _isNonCashflow: isCard, // Individual card transactions are NOT cashflow
+        _isNonCashflow: isCard || (cardDebit && t.company_id === "hapoalim"), // Card detail + hapoalim "מקס" debits are detail
         date: t.activity_date, description: m.display_name || t.description, _origDesc: t.description, memo: t.memo,
         amount: t.charged_amount,
         domain: m.domain || autoDomain, category: effectiveCat,
@@ -697,7 +697,7 @@ function CashflowView({ leads, accountId = "biz" }) {
       { id: "isracard", label: "ישראכרט" },
       { id: "max", label: "מקס" }
     ];
-    const bankCardDebits = new Set(txns.filter(t => isCardDebitFn(t)).map(t => t.activity_date?.slice(0, 7) + "_" + (t.company_id === "otsarHahayal" ? "isracard" : "max")));
+    const bankCardDebits = new Set(txns.filter(t => isCardDebitFn(t) && t.company_id === "otsarHahayal").map(t => t.activity_date?.slice(0, 7) + "_isracard"));
     cardCompanies.forEach(cc => {
       const cardByMonth = {};
       txns.filter(t => t.company_id === cc.id).forEach(t => {
@@ -774,7 +774,7 @@ function CashflowView({ leads, accountId = "biz" }) {
       {(() => {
         const bankSum = accountId === "cash"
           ? unified.filter(t => t._type === "manual" && t.status !== "עתידי").reduce((s, t) => s + t.amount, 0)
-          : unified.filter(t => !t._isNonCashflow && t._type === "bank").reduce((s, t) => s + t.amount, 0);
+          : unified.filter(t => (!t._isNonCashflow && t._type === "bank") || t._isCardSummary).reduce((s, t) => s + t.amount, 0);
         const curBal = (currentBalance || 0) + bankSum;
         return <div style={{ ...S.statCard, borderRight: `3px solid ${accountId === "biz" ? "#10B981" : accountId === "afik" ? "#3B82F6" : "#8B5CF6"}`, marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
