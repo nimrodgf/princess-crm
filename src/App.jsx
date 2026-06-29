@@ -901,7 +901,8 @@ function CashflowView({ leads, accountId = "biz" }) {
               const vdateRaw = r[7] || dateRaw; let vdate;
               if (typeof vdateRaw === "number") { const d = new Date((vdateRaw - 25569) * 86400000); vdate = d.toISOString().slice(0, 10); }
               else { const p = String(vdateRaw).split(/[\/\.]/); vdate = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`; }
-              const uid = `${dateStr}_hapoalim_${expectedAcct}_${amount}_${ref}`;
+              const uidAmt = amount % 1 === 0 ? amount.toFixed(1) : String(amount);
+              const uid = `${dateStr}_hapoalim_${expectedAcct}_${uidAmt}_${ref}`;
               inserts.push({ unique_id: uid, company_id: "hapoalim", account: expectedAcct, description: desc.trim(), memo: memo.trim(), original_currency: "ILS", original_amount: amount, charged_currency: "ILS", charged_amount: amount, activity_date: dateStr, process_date: vdate, status: "completed", scraped_by: "csv_import" });
             }
             if (inserts.length === 0) { _showToast("לא נמצאו תנועות בקובץ", "error"); e.target.value = ""; return; }
