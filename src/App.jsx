@@ -1691,18 +1691,19 @@ const PAY_SPLITS = {
   4: [{ pct: 40, when: "עם חתימת ההסכם" }, { pct: 20, when: "חודש לאחר מכן" }, { pct: 20, when: "חודשיים לאחר מכן" }, { pct: 20, when: "שלושה חודשים לאחר מכן" }],
 };
 
-const CLAUSE_VARS = ["client","episodes","minutes","participants","weeks","price","priceVat","validUntil","signDate","reelsPer","reelLength"];
+const CLAUSE_VARS = ["client","episodes","minutes","participants","weeks","price","priceVat","validUntil","signDate","reelsPer","reelLength","recDate","recTime","deliveryHours"];
+const CONTRACT_TYPES = [{ id: "package", label: "חבילה" }, { id: "trial", label: "פרק ניסיון" }];
 
 const DEFAULT_CLAUSES = [
-  { slug: "intro", part: 1, sort: 10, title: "מה סיכמנו", body:
+  { slug: "intro", kind: "package", part: 1, sort: 10, title: "מה סיכמנו", body:
 `אולפני הנסיכה יספקו ללקוח הקלטה וצילום של {{episodes}} פרקי פודקאסט, באורך {{minutes}} דקות נטו לכל פרק, עם עד {{participants}} משתתפים, בצילום משלוש מצלמות עם ניתוב בזמן אמת, הקלטה עם מיקרופון לכל דובר, עריכת צבע וסאונד{{concentrated}}. לאחר ההקלטה יימסרו ללקוח קבצי MP4 ו־MP3/WAV באיכות HD לבחירת הלקוח, מוכנים להפצה, תוך שלושה ימי עסקים מסיום ההקלטה.` },
-  { slug: "revisions", part: 1, sort: 30, title: "", body:
+  { slug: "revisions", kind: "package", part: 1, sort: 30, title: "", body:
 `כל פרק{{reelSuffix}} כוללים בתוכם סבב תיקונים אחד, לרבות תיקוני טעויות, חיתוכים נקודתיים ותיקונים טכניים סבירים. עריכת תוכן מהותית או עריכה נוספת מעבר לכך - בתשלום נוסף בהתאם לתעריף בהסכם זה.
 
 הלקוח מצהיר כי ביקר באולפן וצפה בדוגמאות עבודה מייצגות של הספק טרם ההתקשרות, כי הוא מכיר את רמת התוצר, סגנון העריכה והצילום, וכי הם מקובלים עליו. אין באמור כדי לגרוע מהתחייבויות הספק ביחס לאיכות ולמפרט השירותים המפורטים בהסכם.
 
 השלמת העונה תיחשב לאחר צילום {{episodes}} הפרקים ומסירת כל התוצרים שסוכמו עבורם - הפרקים המלאים, קבצי האודיו, חומרי הגלם{{reelsDelivery}} - בהתאם למפרט המוסכם ולאחר השלמת סבב התיקונים הכלול בהסכם.` },
-  { slug: "terms", part: 1, sort: 50, title: "תנאי החבילה", body:
+  { slug: "terms", kind: "package", part: 1, sort: 50, title: "תנאי החבילה", body:
 `- הצעת מחיר זו תקפה עד {{validUntil}}
 - החבילה תהיה בתוקף למשך {{weeks}} שבועות ממועד צילום הפרק הראשון. הצדדים יפעלו בתום לב ובשיתוף פעולה לצורך תיאום והשלמת כלל ימי הצילום בתקופה זו.
 - הלקוח יפנה לספק לצורך תיאום יום צילום, ככל האפשר, לפחות 21 ימים מראש ויציע מספר מועדים אפשריים. הספק יעשה מאמץ סביר לאשר אחד מהמועדים המוצעים, וככל שאינו פנוי בהם - יציע מועדים חלופיים קרובים ככל האפשר.
@@ -1711,17 +1712,17 @@ const DEFAULT_CLAUSES = [
 - ניתן להעביר את החבילה לצד שלישי בתיאום מראש
 - דחייה או ביטול פרק בין 7 ימים ל־48 שעות - ערך השעות של הפרק ישמרו בחבילה
 - דחייה או ביטול פחות מ־48 שעות - ירד פרק אחד מערך החבילה` },
-  { slug: "payment_terms", part: 1, sort: 70, title: "", body:
+  { slug: "payment_terms", kind: "package", part: 1, sort: 70, title: "", body:
 `- שריון התאריכים יתבצע אך ורק לאחר העברת התשלום הראשון
 - איחור בתשלום מקנה לספק את הזכות להשעות את מתן השירות ולעכב את מסירת התוצרים עד להסדרת התשלום, מבלי שהדבר ייחשב הפרה מצדו. תקופת ההשעיה לא תבוא במניין תקופת תוקף החבילה.` },
-  { slug: "bank", part: 1, sort: 80, title: "", body:
+  { slug: "bank", kind: "both", part: 1, sort: 80, title: "", body:
 `**נמרוד גולדפרב | בנק אוצר החייל 14 | סניף 344 | חשבון 228991**` },
 
-  { slug: "s1", part: 2, sort: 10, title: "1. כללי", body:
+  { slug: "s1", kind: "both", part: 2, sort: 10, title: "1. כללי", body:
 `- תקנון זה מהווה הסכם מחייב בין אולפני הנסיכה ("הספק") לבין {{client}} ("הלקוח").
 - הזמנת שירות, חתימה על הצעת מחיר או חוזה עבודה, או קבלת השירות בפועל - מהווים הסכמה מלאה ובלתי חוזרת לכל תנאי התקנון ותנאי החבילה.
 - התקנון נועד להסדיר את היחסים בין הצדדים, למנוע אי־הבנות, ולהבטיח חוויית עבודה תקינה ומקצועית.` },
-  { slug: "s2", part: 2, sort: 20, title: "2. השירותים הניתנים", body:
+  { slug: "s2", kind: "both", part: 2, sort: 20, title: "2. השירותים הניתנים", body:
 `- הקלטה וצילום פודקאסט באורך של {{minutes}} דקות נטו
 - צילום משלוש מצלמות. במצב של שני משתתפים - מצלמה ייעודית על כל דובר ושוט רחב. במצב של שלושה משתתפים - מצלמה אחת על דובר אחד, מצלמה שנייה על שני דוברים, ושוט רחב. **נא ליידע 48 שעות מראש על פרקים עם יותר משני משתתפים.**
 - מיקרופון ייעודי לכל דובר
@@ -1735,39 +1736,54 @@ const DEFAULT_CLAUSES = [
   - הפקת פתיח מוזיקלי - 600₪ + מע״מ, תשלום חד־פעמי
   - קובץ מנותב וקבצי גלם באיכות 4K - 250₪ + מע״מ
   - עריכת תוכן - 250₪ + מע״מ לשעה. ככל שהקלטת הפרק תהיה רציפה, וככל שתדעו ותדייקו לנו בדיוק מה אתם רוצים לערוך, יידרש פחות זמן עריכה. ניתן וכדאי לשלב עריכה של כמה פרקים בסשן עריכה אחד ובכך לחסוך עלויות.` },
-  { slug: "s3", part: 2, sort: 30, title: "3. משך ההקלטה", body:
+  { slug: "s3", kind: "both", part: 2, sort: 30, title: "3. משך ההקלטה", body:
 `- ההקלטה והצילום מתחילים ומסתיימים בשעות שנקבעו מראש ולא מעבר להן. ההקלטה מתבצעת ברצף, כולל הפסקות ורגעים "מתים".
 - כל בקשה להסרת חלקים מהתוכן מעבר לסבב התיקונים הכלול תיחשב **עריכה נוספת** ותחויב בתשלום נוסף של 250₪ + מע״מ לשעת עריכה.
 - במידה והצילום התחיל באיחור בגלל הספק, יקבל הלקוח חריגה בזמן הצילום של אותו פרק באופן יחסי לזמן האיחור.` },
-  { slug: "s4", part: 2, sort: 40, title: "4. חומרי גלם ושמירת קבצים", body:
+  { slug: "s4", kind: "package", part: 2, sort: 40, title: "4. חומרי גלם ושמירת קבצים", body:
 `- חומרי הגלם (וידאו ואודיו) יימסרו ללקוח באמצעות שירות אחסון דיגיטלי או כונן זיכרון נייד מטעם הלקוח, עד שלושה ימים מצילום הפרק.
 - הפרק המלא יימסר ללקוח עד שלושה ימי עסקים מסיום ההקלטה, אלא אם הוסכם אחרת בכתב, או במקרה של כוח עליון.
 {{reelsDeliveryLine}}- הספק ישמור את קבצי התוצר למשך 7 ימי עסקים בלבד ממועד מסירת החומרים. לאחר מכן הקבצים יימחקו ולא יישמר אצל הספק עותק נוסף.
 - האחריות לגיבוי ואחסון הקבצים לאחר המסירה - על הלקוח בלבד.` },
-  { slug: "s5", part: 2, sort: 50, title: "5. הגעה למועד ההקלטה", body:
+  { slug: "s5", kind: "both", part: 2, sort: 50, title: "5. הגעה למועד ההקלטה", body:
 `- הלקוח וכל המשתתפים מתבקשים להגיע לפחות 20 דקות לפני מועד תחילת ההקלטה לצורך התארגנות והתאמות טכניות.
 - המצלמות והמיקרופונים מתחילים ומסיימים הקלטה בזמן הנקוב בלבד ולא מעבר לכך. איחור יגרור קיצור זמן ההקלטה, ללא החזר כספי.` },
-  { slug: "s6", part: 2, sort: 60, title: "6. שינויים בציוד ובסידור הסט", body:
+  { slug: "s6", kind: "both", part: 2, sort: 60, title: "6. שינויים בציוד ובסידור הסט", body:
 `- מיקומי המצלמות, התאורה והסט נקבעים מראש על ידי הספק.
 - אין לבצע שינויים במיקומי הציוד. שינויים יבוצעו רק באישור מראש של הספק ועלולים לגרור תוספת תשלום.` },
-  { slug: "s7", part: 2, sort: 70, title: "7. ביטולים ודחיות", body:
+  { slug: "s7", kind: "package", part: 2, sort: 70, title: "7. ביטולים ודחיות", body:
 `- דחייה או ביטול פרק בין 7 ימים ל־48 שעות - יהיה ניתן לשמור את ערך הפרק.
 - דחייה או ביטול פחות מ־48 שעות - ערך הפרק ירד מהחבילה.
 - במקרים חריגים (מחלה, כוח עליון) - ייקבע פתרון חלופי בהתאם לשיקול דעת הספק.` },
-  { slug: "s8", part: 2, sort: 80, title: "8. זכויות יוצרים ושימוש בתכנים", body:
+  { slug: "s8", kind: "both", part: 2, sort: 80, title: "8. זכויות יוצרים ושימוש בתכנים", body:
 `- כל הזכויות על התוכן המוקלט שייכות ללקוח, לרבות הזכות לערוך, לקצר, לפרסם, להפיץ, למסחר ולעשות בהם שימוש בכל פלטפורמה וללא הגבלת זמן.
 - הלקוח מצהיר כי כל התכנים המוקלטים אינם מפרים זכויות יוצרים של צד שלישי, וכי הוא נושא באחריות משפטית מלאה על התוכן.
 - התוכן המופק ומוקלט באולפני הנסיכה הינו באחריותם הבלעדית של האנשים והגופים המייצרים והמציגים אותו. למרות שהאולפן מספק את הכלים להקלטה ולהפקה באיכות גבוהה, איננו מאמצים, תומכים או לוקחים אחריות על כל דעה, אמירה או תוכן המובעים בפודקאסטים המוקלטים באולפן.
 - הלקוח מתחייב לשפות את הספק בגין כל נזק, הוצאה או תביעה שתוגש נגדו כתוצאה מהתוכן המוקלט.
 - הספק רשאי להשתמש בקטעים קצרים מהתוצרים ובצילומי "מאחורי הקלעים" לצרכי שיווק ותיעוד, אלא אם הלקוח ביקש במפורש שלא לעשות זאת בכתב לפני תחילת השירות.
 - הלקוח אחראי ליידע את המשתתפים בהקלטה בדבר האמור בסעיף הקודם.` },
-  { slug: "s9", part: 2, sort: 90, title: "9. אחריות הספק", body:
+  { slug: "s9", kind: "both", part: 2, sort: 90, title: "9. אחריות הספק", body:
 `- הספק מתחייב לבצע את השירות במקצועיות ובאמצעים הטובים ביותר העומדים לרשותו.
 - במקרים בהם פרק או חלק משמעותי ממנו אבד או אינו שמיש עקב תקלה טכנית שבאחריות האולפן, הצילום החוזר יבוצע ללא עלות ולא ייחשב כאחד מפרקי החבילה, ללא פיצוי כספי מצד האולפן.
 - אי־עמידה חוזרת ובלתי סבירה בלוחות הזמנים, או אי־יכולת או אי־נכונות של הספק לספק את השירות שסוכם, תיחשב להפרה מהותית של ההסכם. במקרה כזה תהיה ללקוח אפשרות לסיים את ההתקשרות, לאחר שניתנה לספק אפשרות סבירה לתקן את ההפרה. במקרה של סיום ההתקשרות ישולם לספק החלק היחסי בגין השירותים שסופקו בפועל, וכל יתרה ששולמה בגין שירותים שטרם סופקו תוחזר ללקוח.` },
-  { slug: "s10", part: 2, sort: 100, title: "10. דין וסמכות שיפוט", body:
+  { slug: "s10", kind: "both", part: 2, sort: 100, title: "10. דין וסמכות שיפוט", body:
 `- תקנון זה כפוף לדיני מדינת ישראל.
 - סמכות השיפוט הבלעדית לכל עניין הנובע ממנו תהיה לבית המשפט המוסמך במחוז מרכז.` },
+  { slug: "t_intro", kind: "trial", part: 1, sort: 10, title: "", body:
+`בתאריך {{recDate}} בשעה {{recTime}} הספק יספק ללקוח הקלטה וצילום של פרק פודקאסט אחד בלבד, עם {{participants}} משתתפים, באורך של עד {{minutes}} דקות נטו, בצילום משלוש מצלמות עם ניתוב בין דוברים, הקלטה עם מיקרופון לכל דובר, עריכת צבע ותיקוני סאונד. לאחר ההקלטה יימסרו ללקוח קבצי MP4 ו־MP3/WAV באיכות HD, מוכנים להפצה, תוך {{deliveryHours}} שעות מסיום ההקלטה.` },
+  { slug: "t_payment_terms", kind: "trial", part: 1, sort: 70, title: "", body:
+`- שריון התאריך יתבצע אך ורק לאחר העברת תשלום מלא. ניתן לבצע תשלום במערכת הסליקה או בהעברה בנקאית.` },
+  { slug: "t_s4", kind: "trial", part: 2, sort: 40, title: "4. חומרי גלם ושמירת קבצים", body:
+`- חומרי הגלם (Raw) יימסרו ללקוח באמצעות שירות אחסון דיגיטלי, ויישמרו שם {{deliveryHours}} שעות מיום ההעלאה.
+- הקבצים הסופיים יימסרו ללקוח עד {{deliveryHours}} שעות מסיום ההקלטה, אלא אם הוסכם אחרת בכתב, או במקרה של כוח עליון.
+- הספק ישמור את קבצי התוצר למשך 7 ימי עסקים בלבד ממועד המסירה. לאחר מכן הקבצים יימחקו ולא יישמר אצל הספק עותק נוסף.
+- האחריות לגיבוי ואחסון הקבצים לאחר המסירה - על הלקוח בלבד.` },
+  { slug: "t_s7", kind: "trial", part: 2, sort: 70, title: "7. ביטולים ודחיות", body:
+`- ביטול עד 7 ימי עסקים לפני המועד - החזר מלא.
+- ביטול בין 7 ימים ל־48 שעות לפני המועד - חיוב של 50% ממחיר השירות.
+- ביטול פחות מ־48 שעות לפני המועד - חיוב מלא.
+- דחייה תתאפשר בהתראה של לפחות 72 שעות, בכפוף לזמינות האולפן.
+- במקרים חריגים (מחלה, כוח עליון) - ייקבע פתרון חלופי בהתאם לשיקול דעת הספק.` },
 ];
 
 const esc = s => String(s == null ? "" : s);
@@ -1801,9 +1817,13 @@ function renderClauseBody(text, vars) {
 }
 
 function buildContractHTML(f, clauses) {
-  const list = (clauses && clauses.length ? clauses : DEFAULT_CLAUSES).slice().sort((a, b) => (a.sort || 0) - (b.sort || 0));
+  const kind = f.contractType === "trial" ? "trial" : "package";
+  const list = (clauses && clauses.length ? clauses : DEFAULT_CLAUSES)
+    .filter(c => !c.kind || c.kind === "both" || c.kind === kind)
+    .slice().sort((a, b) => (a.sort || 0) - (b.sort || 0));
   const bySlug = {};
   list.forEach(c => { bySlug[c.slug] = c; });
+  const isTrial = f.contractType === "trial";
   const vat = Math.round(f.price * 1.18);
   const splits = PAY_SPLITS[f.payments] || PAY_SPLITS[1];
   const fmtIL = d => d ? new Date(d).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" }) : "____";
@@ -1816,6 +1836,7 @@ function buildContractHTML(f, clauses) {
     weeks: f.weeks, price: f.price.toLocaleString(), priceVat: vat.toLocaleString(),
     validUntil: fmtIL(f.validUntil), signDate: fmtIL(f.signDate),
     reelsPer: n, reelLength: f.reelLength,
+    recDate: f.recDate ? fmtIL(f.recDate) : "____", recTime: f.recTime || "____", deliveryHours: f.deliveryHours || 72,
     concentrated: f.concentrated ? ", בימי צילום מרוכזים של לפחות שני פרקים ביום" : "",
     reelSuffix: hasReels ? " וריל" : "",
     reelsDelivery: hasReels ? (n === 1 ? " והריל" : " והרילז") : "",
@@ -1843,9 +1864,18 @@ function buildContractHTML(f, clauses) {
       ? `<li>חלוקת התשלום:<ul>${splits.map(s => `<li>${Math.round(vat * s.pct / 100).toLocaleString()}₪ (${s.pct}%) - ${s.when}</li>`).join("")}</ul></li>`
       : `<li>התשלום ישולם במלואו עם חתימת ההסכם</li>`);
 
-  const part1 = `<h1>הסכם עבודה - הקלטה וצילום פודקאסט - חבילה</h1>
+  const head = `<h1>הסכם עבודה - הקלטה וצילום פודקאסט - ${kind === "trial" ? "פרק ניסיון" : "חבילה"}</h1>
 <p class="party"><b>הספק:</b> אולפני הנסיכה</p>
-<p class="party"><b>הלקוח:</b> ${f.clientName}</p>
+<p class="party"><b>הלקוח:</b> ${f.clientName}</p>`;
+
+  const part1 = kind === "trial"
+    ? `${head}
+${blk("t_intro")}
+<h2>מחיר ותשלום</h2>
+<ul><li>מחיר לפרק: ${f.price.toLocaleString()}₪ + מע״מ (<b>${vat.toLocaleString()}₪</b>)</li></ul>
+${renderClauseBody(bySlug.t_payment_terms ? bySlug.t_payment_terms.body : "", vars)}
+<div class="bankwrap">${renderClauseBody(bySlug.bank ? bySlug.bank.body : "", vars)}</div>`
+    : `${head}
 ${blk("intro")}
 ${reelPara}
 ${blk("revisions")}
@@ -1936,7 +1966,7 @@ function ClauseEditor({ clause, onSave, onReset, saving }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setOpen(!open)}>
         <span style={{ fontSize: 11, color: "#64748B" }}>{open ? "▼" : "◀"}</span>
         <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{clause.title || (clause.slug === "bank" ? "פרטי בנק" : clause.slug === "revisions" ? "תיקונים והצהרות" : clause.slug === "payment_terms" ? "תנאי תשלום" : clause.slug)}</span>
-        <span style={{ fontSize: 10, color: "#475569" }}>{clause.part === 1 ? "הסכם" : "תקנון"}</span>
+        <span style={{ fontSize: 10, color: "#475569" }}>{clause.part === 1 ? "הסכם" : "תקנון"}{clause.kind && clause.kind !== "both" ? (clause.kind === "trial" ? " · פרק ניסיון" : " · חבילה") : ""}</span>
         {dirty && <span style={{ fontSize: 10, color: "#F59E0B" }}>● לא נשמר</span>}
       </div>
       {open && (
@@ -1959,9 +1989,11 @@ function ClauseEditor({ clause, onSave, onReset, saving }) {
 
 function ContractGenerator({ leads }) {
   const [f, setF] = useState({
+    contractType: "package",
     clientName: "", episodes: 10, minutes: 60, participants: 4, concentrated: false,
     reelsPer: 1, reelsType: "רגילים", reelLength: 90, subtitles: true,
     price: 7000, payments: 1, validUntil: "", weeks: 26, signDate: new Date().toISOString().split("T")[0],
+    recDate: "", recTime: "", deliveryHours: 72,
   });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const [showPreview, setShowPreview] = useState(false);
@@ -1979,8 +2011,20 @@ function ContractGenerator({ leads }) {
   const seedClauses = async () => {
     setSaving(true);
     try {
-      const rows = await sb("contract_clauses", "POST", DEFAULT_CLAUSES.map(x => ({ slug: x.slug, part: x.part, sort: x.sort, title: x.title, body: x.body })));
-      setClauses(rows || DEFAULT_CLAUSES); setDbReady(true); _showToast("✓ הנוסח נטען לעריכה");
+      const existing = await sb("contract_clauses", "GET", null, "?select=id,slug&limit=200").catch(() => []);
+      const have = new Set((existing || []).map(x => x.slug));
+      const missing = DEFAULT_CLAUSES.filter(x => !have.has(x.slug));
+      if (missing.length) {
+        await sb("contract_clauses", "POST", missing.map(x => ({ slug: x.slug, kind: x.kind || "both", part: x.part, sort: x.sort, title: x.title, body: x.body })));
+      }
+      // keep structural fields in sync without touching edited text
+      for (const d of DEFAULT_CLAUSES) {
+        const ex = (existing || []).find(x => x.slug === d.slug);
+        if (ex) await sb("contract_clauses", "PATCH", { kind: d.kind || "both", part: d.part, sort: d.sort }, `?id=eq.${ex.id}`).catch(() => {});
+      }
+      const rows = await sb("contract_clauses", "GET", null, "?order=sort.asc&limit=200");
+      setClauses(rows && rows.length ? rows : DEFAULT_CLAUSES); setDbReady(true);
+      _showToast(missing.length ? `✓ נוספו ${missing.length} סעיפים` : "✓ הסעיפים מסונכרנים");
     } catch (e) { _showToast("שגיאה: " + e.message, "error"); }
     setSaving(false);
   };
@@ -2000,6 +2044,7 @@ function ContractGenerator({ leads }) {
     await saveClause(cl, { title: d.title, body: d.body });
   };
 
+  const isTrial = f.contractType === "trial";
   const vat = Math.round(f.price * 1.18);
   const splits = PAY_SPLITS[f.payments] || PAY_SPLITS[1];
   const clientNames = [...new Set(leads.map(l => l.name).filter(Boolean))];
@@ -2032,6 +2077,9 @@ function ContractGenerator({ leads }) {
               <div>שורה שמתחילה ב־<code style={CODE}>- </code> הופכת לפריט ברשימה. שתי רווחים לפניה יוצרים רשימה מקוננת. שורה ריקה מפרידה בין פסקאות. טקסט בין <code style={CODE}>**</code> יוצא מודגש.</div>
               <div style={{ marginTop: 4 }}>משתנים שיוחלפו אוטומטית: {CLAUSE_VARS.map(v => <code key={v} style={CODE}>{"{{" + v + "}}"}</code>)}</div>
             </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+              <button style={{ ...S.btn2, padding: "4px 12px", fontSize: 11 }} disabled={saving} onClick={seedClauses}>סנכרן סעיפים חדשים</button>
+            </div>
             {clauses.slice().sort((a, b) => (a.part - b.part) || (a.sort - b.sort)).map(cl => (
               <ClauseEditor key={cl.id || cl.slug} clause={cl} onSave={saveClause} onReset={resetClause} saving={saving} />
             ))}
@@ -2049,36 +2097,45 @@ function ContractGenerator({ leads }) {
             <span style={{ fontSize: 15, fontWeight: 700 }}>פרטי החוזה</span>
             <button style={{ ...S.btn2, padding: "4px 12px", fontSize: 12 }} onClick={() => setMode("edit")}>✎ עריכת נוסח</button>
           </div>
+          <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+            {CONTRACT_TYPES.map(t => (
+              <button key={t.id} style={{ border: "none", padding: "6px 18px", borderRadius: 10, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: f.contractType === t.id ? 700 : 500, background: f.contractType === t.id ? "#8B5CF6" : "#1E293B", color: f.contractType === t.id ? "#fff" : "#64748B" }}
+                onClick={() => setF(p => ({ ...p, contractType: t.id, price: t.id === "trial" ? 550 : 7000, participants: t.id === "trial" ? 2 : 4, payments: 1 }))}>{t.label}</button>
+            ))}
+          </div>
           <div style={S.grid2}>
             <div style={S.full}><label style={S.lbl}>שם הלקוח *</label>
               <input style={S.inp} value={f.clientName} onChange={e => set("clientName", e.target.value)} placeholder="שם מלא / שם חברה" list="leadNames" />
               <datalist id="leadNames">{clientNames.map(n => <option key={n} value={n} />)}</datalist>
             </div>
-            <div><label style={S.lbl}>מספר פרקים</label><input style={S.inp} type="number" value={f.episodes} onChange={e => set("episodes", Number(e.target.value))} dir="ltr" /></div>
+            {isTrial && <div><label style={S.lbl}>תאריך ההקלטה</label><input style={S.inp} type="date" value={f.recDate} onChange={e => set("recDate", e.target.value)} dir="ltr" /></div>}
+            {isTrial && <div><label style={S.lbl}>שעה</label><input style={S.inp} type="time" value={f.recTime} onChange={e => set("recTime", e.target.value)} dir="ltr" /></div>}
+            {!isTrial && <div><label style={S.lbl}>מספר פרקים</label><input style={S.inp} type="number" value={f.episodes} onChange={e => set("episodes", Number(e.target.value))} dir="ltr" /></div>}
             <div><label style={S.lbl}>אורך פרק (דקות)</label><input style={S.inp} type="number" value={f.minutes} onChange={e => set("minutes", Number(e.target.value))} dir="ltr" /></div>
-            <div><label style={S.lbl}>עד כמה משתתפים</label><input style={S.inp} type="number" value={f.participants} onChange={e => set("participants", Number(e.target.value))} dir="ltr" /></div>
-            <div><label style={S.lbl}>ימי צילום</label><select style={S.inp} value={f.concentrated ? "y" : "n"} onChange={e => set("concentrated", e.target.value === "y")}><option value="n">פרק בכל יום</option><option value="y">מרוכזים — לפחות 2 ביום</option></select></div>
+            <div><label style={S.lbl}>{isTrial ? "מספר משתתפים" : "עד כמה משתתפים"}</label><input style={S.inp} type="number" value={f.participants} onChange={e => set("participants", Number(e.target.value))} dir="ltr" /></div>
+            {isTrial && <div><label style={S.lbl}>מסירה (שעות)</label><input style={S.inp} type="number" value={f.deliveryHours} onChange={e => set("deliveryHours", Number(e.target.value))} dir="ltr" /></div>}
+            {!isTrial && <div><label style={S.lbl}>ימי צילום</label><select style={S.inp} value={f.concentrated ? "y" : "n"} onChange={e => set("concentrated", e.target.value === "y")}><option value="n">פרק בכל יום</option><option value="y">מרוכזים - לפחות 2 ביום</option></select></div>}
           </div>
 
-          <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>רילז</div>
+          {!isTrial && <><div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>רילז</div>
           <div style={S.grid2}>
             <div><label style={S.lbl}>כמות מכל פרק</label><select style={S.inp} value={f.reelsPer} onChange={e => set("reelsPer", Number(e.target.value))}><option value={0}>ללא רילז</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option><option value={5}>5</option></select></div>
             {f.reelsPer > 0 && <div><label style={S.lbl}>סוג</label><select style={S.inp} value={f.reelsType} onChange={e => set("reelsType", e.target.value)}><option>רגילים</option><option>רציפים</option></select></div>}
             {f.reelsPer > 0 && <div><label style={S.lbl}>אורך (שניות)</label><input style={S.inp} type="number" value={f.reelLength} onChange={e => set("reelLength", Number(e.target.value))} dir="ltr" /></div>}
             {f.reelsPer > 0 && <div><label style={S.lbl}>כתוביות וכותרות</label><select style={S.inp} value={f.subtitles ? "y" : "n"} onChange={e => set("subtitles", e.target.value === "y")}><option value="y">כלולות</option><option value="n">לא כלולות</option></select></div>}
-          </div>
+          </div></>}
 
           <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>מחיר ותשלום</div>
           <div style={S.grid2}>
-            <div><label style={S.lbl}>מחיר לפני מע״מ</label><input style={S.inp} type="number" value={f.price} onChange={e => set("price", Number(e.target.value))} dir="ltr" /></div>
+            <div><label style={S.lbl}>{isTrial ? "מחיר לפרק (לפני מע״מ)" : "מחיר לפני מע״מ"}</label><input style={S.inp} type="number" value={f.price} onChange={e => set("price", Number(e.target.value))} dir="ltr" /></div>
             <div><label style={S.lbl}>כולל מע״מ</label><input style={{ ...S.inp, color: "#10B981", fontWeight: 700 }} value={`₪${vat.toLocaleString()}`} readOnly dir="ltr" /></div>
-            <div><label style={S.lbl}>מספר תשלומים</label><select style={S.inp} value={f.payments} onChange={e => set("payments", Number(e.target.value))}><option value={1}>תשלום אחד</option><option value={2}>2 תשלומים</option><option value={3}>3 תשלומים</option><option value={4}>4 תשלומים</option></select></div>
-            <div><label style={S.lbl}>תוקף ההצעה</label><input style={S.inp} type="date" value={f.validUntil} onChange={e => set("validUntil", e.target.value)} dir="ltr" /></div>
-            <div><label style={S.lbl}>תוקף החבילה (שבועות)</label><input style={S.inp} type="number" value={f.weeks} onChange={e => set("weeks", Number(e.target.value))} dir="ltr" /></div>
+            {!isTrial && <div><label style={S.lbl}>מספר תשלומים</label><select style={S.inp} value={f.payments} onChange={e => set("payments", Number(e.target.value))}><option value={1}>תשלום אחד</option><option value={2}>2 תשלומים</option><option value={3}>3 תשלומים</option><option value={4}>4 תשלומים</option></select></div>}
+            {!isTrial && <div><label style={S.lbl}>תוקף ההצעה</label><input style={S.inp} type="date" value={f.validUntil} onChange={e => set("validUntil", e.target.value)} dir="ltr" /></div>}
+            {!isTrial && <div><label style={S.lbl}>תוקף החבילה (שבועות)</label><input style={S.inp} type="number" value={f.weeks} onChange={e => set("weeks", Number(e.target.value))} dir="ltr" /></div>}
             <div><label style={S.lbl}>תאריך חתימה</label><input style={S.inp} type="date" value={f.signDate} onChange={e => set("signDate", e.target.value)} dir="ltr" /></div>
           </div>
 
-          {f.payments > 1 && <div style={{ marginTop: 10, padding: 10, background: "#0F172A", borderRadius: 8, fontSize: 12 }}>
+          {!isTrial && f.payments > 1 && <div style={{ marginTop: 10, padding: 10, background: "#0F172A", borderRadius: 8, fontSize: 12 }}>
             {splits.map((s, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span>{s.when}</span><span style={{ color: "#10B981", fontWeight: 600, direction: "ltr" }}>₪{Math.round(vat * s.pct / 100).toLocaleString()} ({s.pct}%)</span></div>)}
           </div>}
 
