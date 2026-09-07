@@ -1940,6 +1940,7 @@ function buildContractHTML(f, clauses) {
   const part1 = kind === "trial"
     ? `${head}
 ${blk("t_intro")}
+${hasReels ? reelPara.replace("</p>", ` ${n === 1 ? "הריל יימסר" : "הרילז יימסרו"} עד חמישה ימי עסקים מרגע שהלקוח נתן הוראות לעריכה.</p>`) : ""}
 <div class="keep"><h2>מחיר ותשלום</h2>
 <ul><li>מחיר לפרק: ${f.price.toLocaleString()}₪ + מע״מ (<b>${vat.toLocaleString()}₪</b>)</li></ul>
 ${renderClauseBody(bySlug.t_payment_terms ? bySlug.t_payment_terms.body : "", vars)}
@@ -2211,7 +2212,7 @@ function ContractGenerator({ leads }) {
             {!isSingle && <div><label style={S.lbl}>ימי צילום</label><select style={S.inp} value={f.concentrated ? "y" : "n"} onChange={e => set("concentrated", e.target.value === "y")}><option value="n">פרק בכל יום</option><option value="y">מרוכזים - לפחות 2 ביום</option></select></div>}
           </div>
 
-          {!isSingle && <><div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>רילז</div>
+          {!isShort && <><div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>רילז</div>
           <div style={S.grid2}>
             <div><label style={S.lbl}>כמות מכל פרק</label><select style={S.inp} value={f.reelsPer} onChange={e => set("reelsPer", Number(e.target.value))}><option value={0}>ללא רילז</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option><option value={5}>5</option></select></div>
             {f.reelsPer > 0 && <div><label style={S.lbl}>סוג</label><select style={S.inp} value={f.reelsType} onChange={e => set("reelsType", e.target.value)}><option>רגילים</option><option>רציפים</option></select></div>}
