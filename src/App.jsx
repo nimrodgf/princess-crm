@@ -1871,10 +1871,10 @@ function buildContractHTML(f, clauses) {
   const part1 = kind === "trial"
     ? `${head}
 ${blk("t_intro")}
-<h2>מחיר ותשלום</h2>
+<div class="keep"><h2>מחיר ותשלום</h2>
 <ul><li>מחיר לפרק: ${f.price.toLocaleString()}₪ + מע״מ (<b>${vat.toLocaleString()}₪</b>)</li></ul>
 ${renderClauseBody(bySlug.t_payment_terms ? bySlug.t_payment_terms.body : "", vars)}
-<div class="bankwrap">${renderClauseBody(bySlug.bank ? bySlug.bank.body : "", vars)}</div>`
+<div class="bankwrap">${renderClauseBody(bySlug.bank ? bySlug.bank.body : "", vars)}</div></div>`
     : `${head}
 ${blk("intro")}
 ${reelPara}
@@ -1882,10 +1882,10 @@ ${blk("revisions")}
 <h3>סיכום החבילה</h3>
 <ul>${summaryItems}</ul>
 ${blk("terms")}
-<h2>מחיר ותשלום</h2>
+<div class="keep"><h2>מחיר ותשלום</h2>
 <ul>${priceItems}</ul>
 ${renderClauseBody(bySlug.payment_terms ? bySlug.payment_terms.body : "", vars)}
-<div class="bankwrap">${renderClauseBody(bySlug.bank ? bySlug.bank.body : "", vars)}</div>`;
+<div class="bankwrap">${renderClauseBody(bySlug.bank ? bySlug.bank.body : "", vars)}</div></div>`;
 
   const part2 = `<h1>תקנון ותנאי שירות - אולפני הנסיכה</h1>
 ${list.filter(c => c.part === 2).map(c => blk(c.slug)).join("\n")}
@@ -1908,7 +1908,7 @@ table.pw { width: 100%; border-collapse: collapse; }
 table.pw > thead > tr > td,
 table.pw > tbody > tr > td { padding: 0 14mm; border: none; }
 table.pw > thead > tr > td { padding-top: 10mm; padding-bottom: 6mm; }
-table.pw > tbody > tr > td { padding-bottom: 20mm; vertical-align: top; }
+table.pw > tbody > tr > td { padding-bottom: 4mm; vertical-align: top; }
 table.brk { page-break-before: always; break-before: page; }
 .hdr { text-align: center; }
 .hdr img { width: 132px; height: auto; display: inline-block; }
@@ -1933,10 +1933,10 @@ ul ul { margin: 4px 0; }
   .ftr { max-width: 210mm; margin: 0 auto 16px; }
 }
 @media print {
-  @page { size: A4; margin: 8mm; }
-  .ftr { position: fixed; bottom: 0; right: 0; left: 0; margin: 0; }
+  @page { size: A4; margin: 8mm 8mm 26mm 8mm; }
+  .ftr { position: fixed; bottom: -18mm; right: 0; left: 0; margin: 0; border-top: none; padding-top: 0; }
   h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
-  li, .sign { break-inside: avoid; page-break-inside: avoid; }
+  li, .sign, .keep { break-inside: avoid; page-break-inside: avoid; }
 }`;
 
 const CT_FOOTER = `<div class="ftr"><span>נימשי</span> | <span dir="ltr">052-2505397</span> | <span dir="ltr">nimrodgf@gmail.com</span></div>`;
