@@ -168,7 +168,7 @@ function NotifPanel({notifs,onClose,onSelect,onDismiss}){const dismiss=(n)=>{if(
 
 const EXPENSE_CATS_HOME=["אוכל בחוץ","ביטוחים","דלק","העברות לאפיק/משותף","חשבונות בית","טיפול","כושר","מזון","משתנות","פארם","שכד","תחזוקת רכב"];
 const EXPENSE_CATS_BIZ=["הורדת אשראי","הלוואות וקרנות","חשבונות עסק","לא תזרימי","מעמ ומיסים","ספקים","ציוד","ריביות ועמלות","שיווק","שכד אולפן","תוכנות","תחבצ וחניונים","אחר"];
-const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה","החזרים","העברות בין חשבונות"];
+const INCOME_CATS=["הכנסה","הכנסה בחוב","הכנסה עתידית","מתנה","החזרים","העברות בין חשבונות","לא תזרימי"];
 const ALL_CATS=[...EXPENSE_CATS_HOME,...EXPENSE_CATS_BIZ,...INCOME_CATS];
 const DOMAINS=[{id:"home",label:"בית"},{id:"biz",label:"עסק"},{id:"gift",label:"מתנה"},{id:"foxy",label:"פוקסי"}];
 
@@ -759,8 +759,9 @@ function CashflowView({ leads, accountId = "biz" }) {
   });
 
   const [inclFuture, setInclFuture] = useState(false);
-  const actualTxns = filtered.filter(t => !t._isNonCashflow && t._type !== "recurring" && !(accountId !== "cash" && t._type === "manual" && t.status === "עתידי"));
-  const allTxns = filtered.filter(t => !t._isNonCashflow);
+  const NON_SUMMARY_CATS = new Set(["לא תזרימי", "העברות בין חשבונות"]);
+  const actualTxns = filtered.filter(t => !t._isNonCashflow && !NON_SUMMARY_CATS.has(t.category) && t._type !== "recurring" && !(accountId !== "cash" && t._type === "manual" && t.status === "עתידי"));
+  const allTxns = filtered.filter(t => !t._isNonCashflow && !NON_SUMMARY_CATS.has(t.category));
   const summaryTxns = inclFuture ? allTxns : actualTxns;
   const totalIncome = summaryTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const totalExpense = summaryTxns.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
@@ -1245,7 +1246,7 @@ function DashboardView() {
 
   // Category sets
   const EXCLUDE_EXPENSE_CATS = new Set(["הורדת אשראי", "לא תזרימי"]);
-  const EXCLUDE_INCOME_CATS = new Set(["העברות בין חשבונות"]);
+  const EXCLUDE_INCOME_CATS = new Set(["העברות בין חשבונות", "לא תזרימי"]);
   const EXPENSE_ONLY_CATS = new Set([...EXPENSE_CATS_HOME, ...EXPENSE_CATS_BIZ]);
   const INCOME_ONLY_CATS = new Set(INCOME_CATS);
   const HOME_CATS = new Set(EXPENSE_CATS_HOME);
