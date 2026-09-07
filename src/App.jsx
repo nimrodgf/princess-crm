@@ -7,6 +7,9 @@ const hdrs = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "C
 async function sb(table, method = "GET", body = null, query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { method, headers: hdrs, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
 async function sbMoneyman(query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { headers: { ...hdrs, "Accept-Profile": "moneyman", "Range": "0-9999" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
 async function sbMoneymanWrite(method, query = "", body = null) { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { method, headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman" }, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return true; }
+async function sbUpload(bucket, path, file) { const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURIComponent(path)}`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" }, body: file }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return path; }
+async function sbSignedUrl(bucket, path, expiresIn = 3600) { const res = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${encodeURIComponent(path)}`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn }) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const d = await res.json(); return `${SUPABASE_URL}/storage/v1${d.signedURL}`; }
+async function sbDeleteFile(bucket, path) { const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURIComponent(path)}`, { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }); return res.ok; }
 async function addToCalendar(title, start, desc = "") { try { const r = await fetch(GCAL_URL, { method: "POST", body: JSON.stringify({ title, start, description: desc, duration: 30 }) }); return (await r.json()).success; } catch { return false; } }
 
 const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "frozen", label: "בהקפאה", color: "#64748B", bg: "#64748B15" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
@@ -106,7 +109,7 @@ function PodcastSessions({leadId,sessions,packages,onAdd,onUpdate,onDelete,onAdd
 }
 
 function LeadDetail({lead,interactions,tasks,sessions,packages,onBack,onUpdate,onDelete,onAddInteraction,onUpdateInteraction,onDeleteInteraction,onAddTask,onUpdateTask,onToggleTask,onDeleteTask,onAddSession,onUpdateSession,onDeleteSession,onAddPackage,onUpdatePackage,onDeletePackage}){
-  const [noteText,setNoteText]=useState("");const [noteType,setNoteType]=useState("note");const [noteDate,setNoteDate]=useState(new Date().toISOString().split("T")[0]);const [showTaskForm,setShowTaskForm]=useState(false);const [showEditForm,setShowEditForm]=useState(false);const [editingInteraction,setEditingInteraction]=useState(null);const [editInterText,setEditInterText]=useState("");const [editingTask,setEditingTask]=useState(null);const [editTaskText,setEditTaskText]=useState("");const [showPackage,setShowPackage]=useState(packages.some(p=>p.lead_id===lead.id));
+  const [noteText,setNoteText]=useState("");const [noteType,setNoteType]=useState("note");const [noteDate,setNoteDate]=useState(new Date().toISOString().split("T")[0]);const [showTaskForm,setShowTaskForm]=useState(false);const [showEditForm,setShowEditForm]=useState(false);const [editingInteraction,setEditingInteraction]=useState(null);const [editInterText,setEditInterText]=useState("");const [editingTask,setEditingTask]=useState(null);const [editTaskText,setEditTaskText]=useState("");const [showPackage,setShowPackage]=useState(packages.some(p=>p.lead_id===lead.id));const [uploading,setUploading]=useState(false);const [editDeliv,setEditDeliv]=useState(false);const [delivInput,setDelivInput]=useState(lead.deliverables_url||"");
   const addNote=async()=>{if(!noteText.trim())return;await onAddInteraction({lead_id:lead.id,text:noteText.trim(),type:noteType,date:new Date(noteDate+"T12:00:00").toISOString()});setNoteText("");setNoteDate(new Date().toISOString().split("T")[0]);};
   const leadTasks=tasks.filter(t=>t.lead_id===lead.id).sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));const leadInter=interactions.filter(i=>i.lead_id===lead.id).sort((a,b)=>new Date(b.date)-new Date(a.date));const temp=TEMPS.find(t=>t.id===lead.temperature);
   return(<div style={S.detail}><div style={S.detailTop}><button style={S.backBtn} onClick={onBack}>{I.back} חזרה</button><div style={{display:"flex",gap:6}}><button style={{...S.iconBtn,color:"#8B5CF6"}} onClick={()=>setShowEditForm(true)}>{I.edit}</button><button style={{...S.iconBtn,color:"#EF4444"}} onClick={()=>{if(confirm("למחוק?")){onDelete(lead.id);onBack();}}}>{I.trash}</button></div></div>
@@ -118,6 +121,41 @@ function LeadDetail({lead,interactions,tasks,sessions,packages,onBack,onUpdate,o
   {lead.status==="lost"&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:12,color:"#64748B"}}>סיבה:</span><select style={{...S.inp,width:"auto",padding:"3px 10px",fontSize:12,borderRadius:14}} value={lead.lost_reason||""} onChange={e=>onUpdate(lead.id,{lost_reason:e.target.value})}><option value="">בחר סיבה...</option>{LOST_REASONS.map(r=><option key={r}>{r}</option>)}</select></div>}
   {lead.status==="in_progress"&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center"}}><span style={{fontSize:12,color:"#64748B",marginLeft:6}}>טמפרטורה:</span>{TEMPS.map(t=><button key={t.id} onClick={()=>onUpdate(lead.id,{temperature:lead.temperature===t.id?"":t.id})} style={{border:"none",padding:"3px 10px",borderRadius:12,fontSize:12,cursor:"pointer",fontFamily:"inherit",background:lead.temperature===t.id?t.color:"#1E293B",color:lead.temperature===t.id?"#fff":"#64748B"}}>{t.emoji} {t.label}</button>)}</div>}
   {lead.status==="closed"&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center"}}><span style={{fontSize:12,color:"#64748B",marginLeft:6}}>סטטוס לקוח:</span>{CLIENT_STATUSES.map(cs=><button key={cs.id} onClick={()=>onUpdate(lead.id,{client_status:lead.client_status===cs.id?"":cs.id})} style={{border:"none",padding:"3px 10px",borderRadius:12,fontSize:12,cursor:"pointer",fontFamily:"inherit",background:lead.client_status===cs.id?cs.color:"#1E293B",color:lead.client_status===cs.id?"#fff":"#64748B"}}>{cs.label}</button>)}</div>}
+  {lead.status==="closed"&&<div style={{marginBottom:8,paddingTop:8,borderTop:"1px solid #1E293B",display:"flex",flexDirection:"column",gap:6}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+      <span style={{fontSize:12,color:"#64748B",minWidth:52}}>חוזה:</span>
+      {lead.contract_path?<>
+        <span style={{fontSize:13,color:"#E2E8F0"}}>📄 {lead.contract_name||"חוזה חתום"}</span>
+        <button style={{...S.btn2,padding:"3px 10px",fontSize:11}} onClick={async()=>{try{const u=await sbSignedUrl("contracts",lead.contract_path);window.open(u,"_blank");}catch(e){alert("שגיאה בפתיחת הקובץ: "+e.message);}}}>פתח</button>
+        <button style={{...S.iconBtn,color:"#EF4444",fontSize:11}} onClick={async()=>{if(!confirm("למחוק את החוזה?"))return;await sbDeleteFile("contracts",lead.contract_path);onUpdate(lead.id,{contract_path:"",contract_name:""});}}>{I.trash}</button>
+      </>:<>
+        <input type="file" id={`contract_${lead.id}`} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style={{display:"none"}} onChange={async e=>{
+          const f=e.target.files[0]; if(!f) return;
+          if(f.size>10*1024*1024){alert("הקובץ גדול מ-10MB");e.target.value="";return;}
+          setUploading(true);
+          try{
+            const ext=(f.name.split(".").pop()||"pdf").toLowerCase();
+            const path=`${lead.id}/contract.${ext}`;
+            await sbUpload("contracts",path,f);
+            onUpdate(lead.id,{contract_path:path,contract_name:f.name});
+          }catch(err){alert("שגיאה בהעלאה: "+err.message);}
+          setUploading(false); e.target.value="";
+        }}/>
+        <button style={{...S.btn2,padding:"3px 10px",fontSize:11}} disabled={uploading} onClick={()=>document.getElementById(`contract_${lead.id}`).click()}>{uploading?"מעלה...":"📤 העלה חוזה"}</button>
+      </>}
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+      <span style={{fontSize:12,color:"#64748B",minWidth:52}}>תוצרים:</span>
+      {editDeliv?<>
+        <input style={{...S.inp,flex:1,minWidth:180,padding:"3px 8px",fontSize:12}} value={delivInput} onChange={e=>setDelivInput(e.target.value)} placeholder="https://drive.google.com/..." dir="ltr" autoFocus onKeyDown={e=>{if(e.key==="Enter"){onUpdate(lead.id,{deliverables_url:delivInput.trim()});setEditDeliv(false);}if(e.key==="Escape")setEditDeliv(false);}}/>
+        <button style={{...S.iconBtn,color:"#10B981"}} onClick={()=>{onUpdate(lead.id,{deliverables_url:delivInput.trim()});setEditDeliv(false);}}>{I.check}</button>
+        <button style={{...S.iconBtn,color:"#64748B"}} onClick={()=>{setDelivInput(lead.deliverables_url||"");setEditDeliv(false);}}>{I.x}</button>
+      </>:lead.deliverables_url?<>
+        <a href={lead.deliverables_url} target="_blank" rel="noopener noreferrer" style={{fontSize:13,color:"#3B82F6",textDecoration:"none"}}>📁 פתח תיקייה</a>
+        <button style={{...S.iconBtn,color:"#64748B"}} onClick={()=>{setDelivInput(lead.deliverables_url||"");setEditDeliv(true);}}>{I.edit}</button>
+      </>:<button style={{...S.btn2,padding:"3px 10px",fontSize:11}} onClick={()=>setEditDeliv(true)}>+ הוסף קישור</button>}
+    </div>
+  </div>}
   {lead.notes&&<p style={{fontSize:14,color:"#94A3B8",lineHeight:1.6,margin:"8px 0 0",padding:"8px 0 0",borderTop:"1px solid #1E293B"}}>{lead.notes}</p>}
   <div style={{display:"flex",gap:14,fontSize:12,color:"#475569",marginTop:8,paddingTop:8,borderTop:"1px solid #1E293B"}}><span>נוצר: {fmtDateFull(lead.created_at)}</span><span>עודכן: {daysAgo(lead.updated_at)}</span></div></div>
   {lead.service==="פודקאסטים"&&lead.status==="closed"&&<div style={{...S.section,background:"#111827",borderRadius:10,padding:12,marginTop:12}}>{!showPackage?<button style={S.btn1} onClick={()=>setShowPackage(true)}>🎙 ניהול חבילות פודקאסט</button>:<PodcastSessions leadId={lead.id} sessions={sessions} packages={packages} onAdd={onAddSession} onUpdate={onUpdateSession} onDelete={onDeleteSession} onAddPackage={onAddPackage} onUpdatePackage={onUpdatePackage} onDeletePackage={onDeletePackage}/>}</div>}
