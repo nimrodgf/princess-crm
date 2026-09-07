@@ -1706,9 +1706,7 @@ function buildContractHTML(f) {
 
   const li = a => a.filter(Boolean).map(x => `<li>${x}</li>`).join("");
 
-  return `
-<div class="ct">
-<h1>הסכם עבודה — הקלטה וצילום פודקאסט — חבילה</h1>
+  const part1 = `<h1>הסכם עבודה — הקלטה וצילום פודקאסט — חבילה</h1>
 <p class="party"><b>הספק:</b> אולפני הנסיכה</p>
 <p class="party"><b>הלקוח:</b> ${f.clientName}</p>
 
@@ -1751,9 +1749,8 @@ ${reelPara ? `<p>${reelPara}</p>` : ""}
 </ul>
 <p class="bank">נמרוד גולדפרב | בנק אוצר החייל 14 | סניף 344 | חשבון 228991</p>
 
-<div class="pagebreak"></div>
-
-<h1>תקנון ותנאי שירות — אולפני הנסיכה</h1>
+`;
+  const part2 = `<h1>תקנון ותנאי שירות — אולפני הנסיכה</h1>
 
 <h2>1. כללי</h2>
 <ul>${li([
@@ -1846,45 +1843,62 @@ ${reelPara ? `<p>${reelPara}</p>` : ""}
   <p>חתימה: ___________________</p>
   <p>תאריך: ${fmtIL(f.signDate)}</p>
 </div>
-</div>`;
+`;
+  return { part1, part2 };
 }
 
 const CT_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap');
 * { box-sizing: border-box; }
-body { margin: 0; font-family: 'Assistant','Rubik',sans-serif; font-size: 11pt; line-height: 1.65; color: #111; direction: rtl; }
-.ct h1 { font-size: 17pt; font-weight: 800; text-align: center; margin: 0 0 18px; }
-.ct h2 { font-size: 13pt; font-weight: 700; margin: 20px 0 6px; }
-.ct h3 { font-size: 11.5pt; font-weight: 700; margin: 16px 0 4px; }
-.ct p { margin: 0 0 8px; text-align: justify; }
-.ct p.party { margin: 0 0 4px; text-align: right; }
-.ct p.bank { font-weight: 700; text-align: center; margin: 14px 0; }
-.ct ul { margin: 4px 0 10px; padding-right: 20px; }
-.ct li { margin-bottom: 4px; }
-.ct ul ul { margin: 4px 0; }
-.sign { margin-top: 36px; padding-top: 14px; border-top: 1px solid #ccc; }
-.sign p { margin: 0 0 5px; }
+html, body { margin: 0; padding: 0; }
+body { font-family: 'Assistant','Rubik',sans-serif; font-size: 10.5pt; line-height: 1.6; color: #111; direction: rtl; background: #fff; }
+table.pw { width: 100%; border-collapse: collapse; }
+table.pw > thead > tr > td,
+table.pw > tbody > tr > td,
+table.pw > tfoot > tr > td { padding: 0 14mm; border: none; }
+table.pw > thead > tr > td { padding-top: 10mm; padding-bottom: 6mm; }
+table.pw > tfoot > tr > td { padding-top: 6mm; padding-bottom: 10mm; }
+table.brk { page-break-before: always; break-before: page; }
 .hdr { text-align: center; }
-.hdr img { width: 150px; height: auto; }
-.ftr { text-align: center; font-size: 9pt; color: #666; }
+.hdr img { width: 132px; height: auto; display: inline-block; }
+.ftr { text-align: center; font-size: 8.5pt; color: #777; border-top: 1px solid #e2e2e2; padding-top: 4mm; }
 .ftr span { unicode-bidi: isolate; }
-.pagebreak { break-before: page; page-break-before: always; }
+h1 { font-size: 16pt; font-weight: 800; text-align: center; margin: 0 0 16px; }
+h2 { font-size: 12.5pt; font-weight: 700; margin: 18px 0 6px; }
+h3 { font-size: 11pt; font-weight: 700; margin: 15px 0 4px; }
+p { margin: 0 0 8px; text-align: justify; }
+p.party { margin: 0 0 4px; text-align: right; }
+p.bank { font-weight: 700; text-align: center; margin: 14px 0 0; }
+ul { margin: 4px 0 10px; padding-right: 20px; }
+li { margin-bottom: 4px; }
+ul ul { margin: 4px 0; }
+.sign { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; }
+.sign p { margin: 0 0 5px; }
 @media screen {
-  body { background: #fff; padding: 28px 36px; border-radius: 8px; }
-  .hdr { padding-bottom: 14px; }
-  .ftr { padding-top: 18px; margin-top: 18px; border-top: 1px solid #eee; }
+  body { padding: 0; }
+  table.pw { max-width: 210mm; margin: 0 auto; }
+  table.brk { border-top: 12px solid #eee; }
 }
 @media print {
-  @page { size: A4; margin: 30mm 20mm 24mm 20mm; }
-  body { padding: 0; }
-  .hdr { position: fixed; top: -23mm; right: 0; left: 0; }
-  .ftr { position: fixed; bottom: -16mm; right: 0; left: 0; }
+  @page { size: A4; margin: 8mm; }
   h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
-  li { break-inside: avoid; page-break-inside: avoid; }
-  .sign { break-inside: avoid; page-break-inside: avoid; }
+  li, .sign { break-inside: avoid; page-break-inside: avoid; }
 }`;
 
 const CT_FOOTER = `<div class="ftr"><span>נימשי</span> | <span dir="ltr">052-2505397</span> | <span dir="ltr">nimrodgf@gmail.com</span></div>`;
+
+function ctPage(bodyHtml, isSecond) {
+  return `<table class="pw${isSecond ? " brk" : ""}">
+  <thead><tr><td><div class="hdr"><img src="${LOGO_B64}" alt="אולפני הנסיכה"></div></td></tr></thead>
+  <tfoot><tr><td>${CT_FOOTER}</td></tr></tfoot>
+  <tbody><tr><td>${bodyHtml}</td></tr></tbody>
+</table>`;
+}
+
+function ctDocument(f) {
+  const { part1, part2 } = buildContractHTML(f);
+  return `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>הסכם — ${f.clientName}</title><style>${CT_CSS}</style></head><body>${ctPage(part1, false)}${ctPage(part2, true)}</body></html>`;
+}
 
 function ContractGenerator({ leads }) {
   const [f, setF] = useState({
@@ -1899,7 +1913,7 @@ function ContractGenerator({ leads }) {
   const clientNames = [...new Set(leads.map(l => l.name).filter(Boolean))];
 
   const printContract = () => {
-    const doc = `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>הסכם — ${f.clientName}</title><style>${CT_CSS}</style></head><body><div class="hdr"><img src="${LOGO_B64}" alt="אולפני הנסיכה"></div>${CT_FOOTER}${buildContractHTML(f)}</body></html>`;
+    const doc = ctDocument(f);
     const w = window.open("", "_blank");
     if (!w) { alert("החלון נחסם. אפשר חלונות קופצים לאתר ונסה שוב."); return; }
     w.document.open(); w.document.write(doc); w.document.close();
@@ -1958,7 +1972,7 @@ function ContractGenerator({ leads }) {
             <iframe
               title="preview"
               style={{ width: "100%", height: "78vh", border: "none", background: "#fff" }}
-              srcDoc={`<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><style>${CT_CSS}</style></head><body><div class="hdr"><img src="${LOGO_B64}"></div>${buildContractHTML(f)}${CT_FOOTER}</body></html>`}
+              srcDoc={ctDocument(f)}
             />
           </div>
         </>
