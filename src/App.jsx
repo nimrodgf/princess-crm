@@ -1683,6 +1683,7 @@ function Stats({leads}){const total=leads.length;const byStatus=STATUSES.map(s=>
 
 
 // ============ CONTRACT GENERATOR ============
+const LOGO_B64 = "data:image/png;base64,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";
 const PAY_SPLITS = {
   1: [{ pct: 100, when: "עם חתימת ההסכם" }],
   2: [{ pct: 50, when: "עם חתימת ההסכם" }, { pct: 50, when: "חודש לאחר מכן" }],
@@ -1711,7 +1712,29 @@ function ContractGenerator({ leads }) {
 
   return (
     <div style={{ padding: "8px 0 20px" }}>
-      <style>{`@media print { body * { visibility: hidden; } #contractPrint, #contractPrint * { visibility: visible; } #contractPrint { position: absolute; right: 0; top: 0; width: 100%; padding: 0; } .noprint { display: none !important; } }`}</style>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap');
+        #contractPrint { font-family: 'Assistant', sans-serif; }
+        .ctPage { position: relative; }
+        .ctHead { text-align: center; padding-bottom: 10px; }
+        .ctHead img { width: 190px; height: auto; }
+        .ctFoot { text-align: center; font-size: 10pt; color: #555; direction: ltr; padding-top: 8px; border-top: 1px solid #ddd; }
+        @media screen {
+          .ctFoot { margin-top: 20px; }
+        }
+        @media print {
+          @page { size: A4; margin: 24mm 16mm 20mm 16mm; }
+          body * { visibility: hidden; }
+          #contractPrint, #contractPrint * { visibility: visible; }
+          #contractPrint { position: absolute; right: 0; top: 0; width: 100%; padding: 0; background: #fff; }
+          .noprint { display: none !important; }
+          .ctHead { position: fixed; top: -18mm; right: 0; left: 0; }
+          .ctHead img { width: 150px; }
+          .ctFoot { position: fixed; bottom: -14mm; right: 0; left: 0; border-top: none; }
+          h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+          ul, li { break-inside: avoid; page-break-inside: avoid; }
+        }
+      `}</style>
 
       {!showPreview ? (
         <div style={{ ...S.statCard }}>
@@ -1729,7 +1752,7 @@ function ContractGenerator({ leads }) {
 
           <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>רילז</div>
           <div style={S.grid2}>
-            <div><label style={S.lbl}>כמות מכל פרק</label><select style={S.inp} value={f.reelsPer} onChange={e => set("reelsPer", Number(e.target.value))}><option value={0}>ללא רילז</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option></select></div>
+            <div><label style={S.lbl}>כמות מכל פרק</label><select style={S.inp} value={f.reelsPer} onChange={e => set("reelsPer", Number(e.target.value))}><option value={0}>ללא רילז</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option><option value={5}>5</option></select></div>
             {f.reelsPer > 0 && <div><label style={S.lbl}>סוג</label><select style={S.inp} value={f.reelsType} onChange={e => set("reelsType", e.target.value)}><option>רגילים</option><option>רציפים</option></select></div>}
             {f.reelsPer > 0 && <div><label style={S.lbl}>אורך (שניות)</label><input style={S.inp} type="number" value={f.reelLength} onChange={e => set("reelLength", Number(e.target.value))} dir="ltr" /></div>}
             {f.reelsPer > 0 && <div><label style={S.lbl}>כתוביות וכותרות</label><select style={S.inp} value={f.subtitles ? "y" : "n"} onChange={e => set("subtitles", e.target.value === "y")}><option value="y">כלולות</option><option value="n">לא כלולות</option></select></div>}
@@ -1759,9 +1782,11 @@ function ContractGenerator({ leads }) {
             <button style={S.btn2} onClick={() => setShowPreview(false)}>← חזרה לעריכה</button>
             <button style={S.btn1} onClick={() => window.print()}>🖨 הדפס / שמור כ-PDF</button>
           </div>
-          <div id="contractPrint" style={{ background: "#fff", color: "#111", padding: "32px 40px", borderRadius: 8, direction: "rtl", fontFamily: "'Rubik',sans-serif", fontSize: 13, lineHeight: 1.7 }}>
+          <div id="contractPrint" style={{ background: "#fff", color: "#111", padding: "28px 40px", borderRadius: 8, direction: "rtl", fontSize: "11pt", lineHeight: 1.7 }}>
+            <div className="ctHead"><img src={LOGO_B64} alt="אולפני הנסיכה" /></div>
+            <div className="ctFoot">נימשי | 052-2505397 | nimrodgf@gmail.com</div>
 
-            <h1 style={{ fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 20px" }}>הסכם עבודה — הקלטה וצילום פודקאסט — חבילה</h1>
+            <h1 style={{ fontSize: "17pt", fontWeight: 800, textAlign: "center", margin: "0 0 20px" }}>הסכם עבודה — הקלטה וצילום פודקאסט — חבילה</h1>
             <p style={{ margin: "0 0 4px" }}><strong>הספק:</strong> אולפני הנסיכה</p>
             <p style={{ margin: "0 0 16px" }}><strong>הלקוח:</strong> {f.clientName}</p>
 
@@ -1805,7 +1830,7 @@ function ContractGenerator({ leads }) {
             <p style={{ fontWeight: 700, textAlign: "center", margin: "12px 0" }}>נמרוד גולדפרב | בנק אוצר החייל 14 | סניף 344 | חשבון 228991</p>
 
             <div style={{ pageBreakBefore: "always", paddingTop: 24 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 20px" }}>תקנון ותנאי שירות — אולפני הנסיכה</h1>
+              <h1 style={{ fontSize: "17pt", fontWeight: 800, textAlign: "center", margin: "0 0 20px" }}>תקנון ותנאי שירות — אולפני הנסיכה</h1>
 
               <h2 style={CS.h2}>1. כללי</h2>
               <ul style={CS.ul}>
@@ -1875,7 +1900,7 @@ function ContractGenerator({ leads }) {
                 <li>הלקוח מצהיר כי כל התכנים המוקלטים אינם מפרים זכויות יוצרים של צד שלישי, וכי הוא נושא באחריות משפטית מלאה על התוכן.</li>
                 <li>התוכן המופק ומוקלט באולפני הנסיכה הינו באחריותם הבלעדית של האנשים והגופים המייצרים והמציגים אותו. למרות שהאולפן מספק את הכלים להקלטה ולהפקה באיכות גבוהה, איננו מאמצים, תומכים או לוקחים אחריות על כל דעה, אמירה או תוכן המובעים בפודקאסטים המוקלטים באולפן.</li>
                 <li>הלקוח מתחייב לשפות את הספק בגין כל נזק, הוצאה או תביעה שתוגש נגדו כתוצאה מהתוכן המוקלט.</li>
-                <li>הלקוח אחראי ליידע את האורחים המשתתפים בהקלטה בדבר האמור בסעיף זה.</li>
+                <li>הלקוח אחראי ליידע את המשתתפים בהקלטה כי הספק רשאי לעשות שימוש בקטעים קצרים מהתוצרים ובצילומי "מאחורי הקלעים" לצרכי שיווק ותיעוד.</li>
                 <li>הספק רשאי להשתמש בקטעים קצרים מהתוצרים ובצילומי "מאחורי הקלעים" לצרכי שיווק ותיעוד, אלא אם הלקוח ביקש במפורש שלא לעשות זאת בכתב לפני תחילת השירות.</li>
               </ul>
 
@@ -1900,7 +1925,6 @@ function ContractGenerator({ leads }) {
               </div>
             </div>
 
-            <p style={{ textAlign: "center", fontSize: 11, color: "#666", marginTop: 24, direction: "ltr" }}>nimrodgf@gmail.com | 052-2505397 | נימשי</p>
           </div>
         </>
       )}
@@ -1909,8 +1933,8 @@ function ContractGenerator({ leads }) {
 }
 
 const CS = {
-  h2: { fontSize: 15, fontWeight: 700, margin: "18px 0 6px" },
-  h3: { fontSize: 13, fontWeight: 700, margin: "14px 0 4px" },
+  h2: { fontSize: "13pt", fontWeight: 700, margin: "18px 0 6px" },
+  h3: { fontSize: "11.5pt", fontWeight: 700, margin: "14px 0 4px" },
   ul: { margin: "4px 0", paddingRight: 20 },
 };
 
