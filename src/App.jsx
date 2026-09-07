@@ -1691,8 +1691,8 @@ const PAY_SPLITS = {
   4: [{ pct: 40, when: "עם חתימת ההסכם" }, { pct: 20, when: "חודש לאחר מכן" }, { pct: 20, when: "חודשיים לאחר מכן" }, { pct: 20, when: "שלושה חודשים לאחר מכן" }],
 };
 
-const CLAUSE_VARS = ["client","episodes","minutes","participants","weeks","price","priceVat","validUntil","signDate","reelsPer","reelLength","recDate","recTime","deliveryHours"];
-const CONTRACT_TYPES = [{ id: "package", label: "חבילה" }, { id: "trial", label: "פרק ניסיון" }];
+const CLAUSE_VARS = ["client","episodes","minutes","participants","weeks","price","priceVat","validUntil","signDate","reelsPer","reelLength","recDate","recTime","deliveryHours","duration"];
+const CONTRACT_TYPES = [{ id: "package", label: "חבילה" }, { id: "trial", label: "פרק ניסיון" }, { id: "short", label: "נוסח מקוצר" }];
 
 const DEFAULT_CLAUSES = [
   { slug: "intro", kind: "package", part: 1, sort: 10, title: "מה סיכמנו", body:
@@ -1784,6 +1784,41 @@ const DEFAULT_CLAUSES = [
 - ביטול פחות מ־48 שעות לפני המועד - חיוב מלא.
 - דחייה תתאפשר בהתראה של לפחות 72 שעות, בכפוף לזמינות האולפן.
 - במקרים חריגים (מחלה, כוח עליון) - ייקבע פתרון חלופי בהתאם לשיקול דעת הספק.` },
+  { slug: "short_text", kind: "short", part: 1, sort: 10, title: "", body:
+`היי {{client}}!
+קבענו להפגש ב{{recDate}} בשעה {{recTime}} ל{{duration}} צילום - פודקאסט {{participants}} משתתפים באולפני הנסיכה - הדקל 21 אודים
+
+ככה עובד אצלנו פרק הקלטה + צילום:
+
+מה כלול:
+* צילום מ-3 מצלמות: מצלמה 1 - את/ה. מצלמה 2 - האורח/ת שלך. מצלמה 3 - כולם יחד. במצב של שלושה משתתפים ויותר - באחת או שתי המצלמות יהיו שני דוברים.
+* מיקרופון ייעודי לכל דובר/ת
+* ניתוב + צבע + מיקס
+* קובץ MP4 (HD) + MP3/WAV מוכנים להעלאה, תוך {{deliveryHours}} שעות מסיום ההקלטה
+* ההקלטה מתחילה ונגמרת בזמנים שנקבעו
+
+מחיר: {{price}}₪ + מע"מ ({{priceVat}}₪ סה"כ)
+
+חשוב לדעת:
+* כדאי להגיע 15-20 דק' לפני, כדי שנספיק להתארגן - ההקלטה מתחילה ונגמרת בול בזמן שסוכם, גם אם יש איחור מהצד שלכם (בלי החזר על הזמן שהלך לאיבוד)
+* מומלץ לא ללבוש ביגוד עם פסים צפופים או משבצות קטנות - זה יכול לרצד במצלמה
+* מיקום המצלמות, התאורה והסט נקבעים מראש על ידינו - אם רוצים לשנות דברים יש להודיע מראש, השינוי בתוספת תשלום.
+* הגלם והחומרים הסופיים נשמרים אצלנו 7 ימי עסקים בלבד אחרי המסירה - אז חשוב לגבות אצלכם ברגע שמקבלים את התוצרים! אם רוצים חומרי גלם באותו יום אפשר להביא הארדיסק SSD מפורמט למק.
+* ביטול פחות מ-48 שעות = חיוב מלא. דחייה אפשרית בהתראה של לפחות 72 שעות ובכפוף לזמינות.
+* כל הזכויות על התוכן שלכם, אתם אחראים על התוכן שאתם מעלים (זכויות יוצרים וכו'), ואנחנו לא לוקחים אחריות על מה שנאמר בפרק
+* אנחנו כן משתמשים בקטעים קצרים/מאחורי הקלעים לשיווק, אלא אם תבקשו אחרת מראש
+* אנחנו נמצאים במשק משפחתי, אנא השארו באזור האולפן וכבדו את המשק ותושביו
+* אנחנו מתחייבים לספק את השירות המקצועי ביותר ותוצרים ברמה שעומדת בסטנדרט של פודקאסטים בארץ, במידה ויהיו תקלות טכניות/כח עליון שיגרמו לפרק להיות לא שלם או לא שמיש בצורה גורפת, יקבע מועד חדש להקלטה על חשבוננו, ללא החזר של הכסף ששולם.
+
+שירותים נוספים במידה ותרצו: עריכת רילז (250₪+מע"מ לריל של עד 90 שניות), ייצוא חומרים לשימוש ברשתות חברתיות (250₪+מע"מ לכחמישה קטעים רציפים), פתיח מוזיקלי (600₪+מע"מ), עריכת תוכן (250₪+מע"מ לשעה)
+
+הגעה
+הדקל 21 אודים - בכניסה למשק יש שלט - מש׳ גרעין
+כניסה לדרך עפר - ממשיכים בה ישר עד הסוף בצמוד לאורנים שבצד שמאל עד שרואים שער במבוק - שם האולפן
+
+אם מגיעים מכביש 553 - אחרי השער של המושב סופרים 5 במפרים ומיד אחרי החמישי פונים שמאלה למשק
+
+אם מגיעים מכביש 2 - נכנסים למושב לרחוב הצאלון, בצומת T לוקחים שמאלה לרחוב הדקל, המשק יהיה מימין לאחר כ 800 מ׳ אחרי תחנת האוטובוס השניה.` },
 ];
 
 const esc = s => String(s == null ? "" : s);
@@ -1816,6 +1851,25 @@ function renderClauseBody(text, vars) {
   return html;
 }
 
+function substVars(text, vars) {
+  let t = String(text == null ? "" : text);
+  Object.keys(vars).forEach(k => { t = t.split("{{" + k + "}}").join(String(vars[k] == null ? "" : vars[k])); });
+  return t.replace(/\{\{[^}]*\}\}/g, "");
+}
+
+function buildShortText(f, clauses) {
+  const src = (clauses && clauses.length ? clauses : DEFAULT_CLAUSES).find(c => c.slug === "short_text")
+    || DEFAULT_CLAUSES.find(c => c.slug === "short_text");
+  const vat = Math.round(f.price * 1.18);
+  const fmtIL = d => d ? new Date(d).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" }) : "____";
+  return substVars(src ? src.body : "", {
+    client: f.clientName || "____", recDate: f.recDate ? fmtIL(f.recDate) : "____",
+    recTime: f.recTime || "____", duration: f.duration || "שעת",
+    participants: f.participants, price: f.price.toLocaleString(),
+    priceVat: vat.toLocaleString(), deliveryHours: f.deliveryHours || 72,
+  });
+}
+
 function buildContractHTML(f, clauses) {
   const kind = f.contractType === "trial" ? "trial" : "package";
   const list = (clauses && clauses.length ? clauses : DEFAULT_CLAUSES)
@@ -1823,7 +1877,6 @@ function buildContractHTML(f, clauses) {
     .slice().sort((a, b) => (a.sort || 0) - (b.sort || 0));
   const bySlug = {};
   list.forEach(c => { bySlug[c.slug] = c; });
-  const isTrial = f.contractType === "trial";
   const vat = Math.round(f.price * 1.18);
   const splits = PAY_SPLITS[f.payments] || PAY_SPLITS[1];
   const fmtIL = d => d ? new Date(d).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" }) : "____";
@@ -2012,11 +2065,12 @@ function ContractGenerator({ leads }) {
     clientName: "", episodes: 10, minutes: 60, participants: 4, concentrated: false,
     reelsPer: 1, reelsType: "רגילים", reelLength: 90, subtitles: true,
     price: 7000, payments: 1, validUntil: "", weeks: 26, signDate: new Date().toISOString().split("T")[0],
-    recDate: "", recTime: "", deliveryHours: 72,
+    recDate: "", recTime: "", deliveryHours: 72, duration: "שעת",
   });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const [showPreview, setShowPreview] = useState(false);
   const [mode, setMode] = useState("form");
+  const [copied, setCopied] = useState(false);
   const [clauses, setClauses] = useState(DEFAULT_CLAUSES);
   const [dbReady, setDbReady] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2064,6 +2118,8 @@ function ContractGenerator({ leads }) {
   };
 
   const isTrial = f.contractType === "trial";
+  const isShort = f.contractType === "short";
+  const isSingle = isTrial || isShort;
   const vat = Math.round(f.price * 1.18);
   const splits = PAY_SPLITS[f.payments] || PAY_SPLITS[1];
   const clientNames = [...new Set(leads.map(l => l.name).filter(Boolean))];
@@ -2121,7 +2177,7 @@ function ContractGenerator({ leads }) {
           <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
             {CONTRACT_TYPES.map(t => (
               <button key={t.id} style={{ border: "none", padding: "6px 18px", borderRadius: 10, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: f.contractType === t.id ? 700 : 500, background: f.contractType === t.id ? "#8B5CF6" : "#1E293B", color: f.contractType === t.id ? "#fff" : "#64748B" }}
-                onClick={() => setF(p => ({ ...p, contractType: t.id, price: t.id === "trial" ? 550 : 7000, participants: t.id === "trial" ? 2 : 4, payments: 1 }))}>{t.label}</button>
+                onClick={() => { setCopied(false); setF(p => ({ ...p, contractType: t.id, price: t.id === "package" ? 7000 : 550, participants: t.id === "package" ? 4 : 2, payments: 1 })); }}>{t.label}</button>
             ))}
           </div>
           <div style={S.grid2}>
@@ -2129,16 +2185,17 @@ function ContractGenerator({ leads }) {
               <input style={S.inp} value={f.clientName} onChange={e => set("clientName", e.target.value)} placeholder="שם מלא / שם חברה" list="leadNames" />
               <datalist id="leadNames">{clientNames.map(n => <option key={n} value={n} />)}</datalist>
             </div>
-            {isTrial && <div><label style={S.lbl}>תאריך ההקלטה</label><input style={S.inp} type="date" value={f.recDate} onChange={e => set("recDate", e.target.value)} dir="ltr" /></div>}
-            {isTrial && <div><label style={S.lbl}>שעה</label><input style={S.inp} type="time" value={f.recTime} onChange={e => set("recTime", e.target.value)} dir="ltr" /></div>}
-            {!isTrial && <div><label style={S.lbl}>מספר פרקים</label><input style={S.inp} type="number" value={f.episodes} onChange={e => set("episodes", Number(e.target.value))} dir="ltr" /></div>}
-            <div><label style={S.lbl}>אורך פרק (דקות)</label><input style={S.inp} type="number" value={f.minutes} onChange={e => set("minutes", Number(e.target.value))} dir="ltr" /></div>
-            <div><label style={S.lbl}>{isTrial ? "מספר משתתפים" : "עד כמה משתתפים"}</label><input style={S.inp} type="number" value={f.participants} onChange={e => set("participants", Number(e.target.value))} dir="ltr" /></div>
-            {isTrial && <div><label style={S.lbl}>מסירה (שעות)</label><input style={S.inp} type="number" value={f.deliveryHours} onChange={e => set("deliveryHours", Number(e.target.value))} dir="ltr" /></div>}
-            {!isTrial && <div><label style={S.lbl}>ימי צילום</label><select style={S.inp} value={f.concentrated ? "y" : "n"} onChange={e => set("concentrated", e.target.value === "y")}><option value="n">פרק בכל יום</option><option value="y">מרוכזים - לפחות 2 ביום</option></select></div>}
+            {isSingle && <div><label style={S.lbl}>תאריך ההקלטה</label><input style={S.inp} type="date" value={f.recDate} onChange={e => set("recDate", e.target.value)} dir="ltr" /></div>}
+            {isSingle && <div><label style={S.lbl}>שעה</label><input style={S.inp} type="time" value={f.recTime} onChange={e => set("recTime", e.target.value)} dir="ltr" /></div>}
+            {!isSingle && <div><label style={S.lbl}>מספר פרקים</label><input style={S.inp} type="number" value={f.episodes} onChange={e => set("episodes", Number(e.target.value))} dir="ltr" /></div>}
+            {!isShort && <div><label style={S.lbl}>אורך פרק (דקות)</label><input style={S.inp} type="number" value={f.minutes} onChange={e => set("minutes", Number(e.target.value))} dir="ltr" /></div>}
+            {isShort && <div><label style={S.lbl}>משך הצילום</label><input style={S.inp} value={f.duration} onChange={e => set("duration", e.target.value)} placeholder="שעת / שעתיים" /></div>}
+            <div><label style={S.lbl}>{isSingle ? "מספר משתתפים" : "עד כמה משתתפים"}</label><input style={S.inp} type="number" value={f.participants} onChange={e => set("participants", Number(e.target.value))} dir="ltr" /></div>
+            {isSingle && <div><label style={S.lbl}>מסירה (שעות)</label><input style={S.inp} type="number" value={f.deliveryHours} onChange={e => set("deliveryHours", Number(e.target.value))} dir="ltr" /></div>}
+            {!isSingle && <div><label style={S.lbl}>ימי צילום</label><select style={S.inp} value={f.concentrated ? "y" : "n"} onChange={e => set("concentrated", e.target.value === "y")}><option value="n">פרק בכל יום</option><option value="y">מרוכזים - לפחות 2 ביום</option></select></div>}
           </div>
 
-          {!isTrial && <><div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>רילז</div>
+          {!isSingle && <><div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>רילז</div>
           <div style={S.grid2}>
             <div><label style={S.lbl}>כמות מכל פרק</label><select style={S.inp} value={f.reelsPer} onChange={e => set("reelsPer", Number(e.target.value))}><option value={0}>ללא רילז</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option><option value={5}>5</option></select></div>
             {f.reelsPer > 0 && <div><label style={S.lbl}>סוג</label><select style={S.inp} value={f.reelsType} onChange={e => set("reelsType", e.target.value)}><option>רגילים</option><option>רציפים</option></select></div>}
@@ -2148,23 +2205,39 @@ function ContractGenerator({ leads }) {
 
           <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>מחיר ותשלום</div>
           <div style={S.grid2}>
-            <div><label style={S.lbl}>{isTrial ? "מחיר לפרק (לפני מע״מ)" : "מחיר לפני מע״מ"}</label><input style={S.inp} type="number" value={f.price} onChange={e => set("price", Number(e.target.value))} dir="ltr" /></div>
+            <div><label style={S.lbl}>{isSingle ? "מחיר לפרק (לפני מע״מ)" : "מחיר לפני מע״מ"}</label><input style={S.inp} type="number" value={f.price} onChange={e => set("price", Number(e.target.value))} dir="ltr" /></div>
             <div><label style={S.lbl}>כולל מע״מ</label><input style={{ ...S.inp, color: "#10B981", fontWeight: 700 }} value={`₪${vat.toLocaleString()}`} readOnly dir="ltr" /></div>
-            {!isTrial && <div><label style={S.lbl}>מספר תשלומים</label><select style={S.inp} value={f.payments} onChange={e => set("payments", Number(e.target.value))}><option value={1}>תשלום אחד</option><option value={2}>2 תשלומים</option><option value={3}>3 תשלומים</option><option value={4}>4 תשלומים</option></select></div>}
-            {!isTrial && <div><label style={S.lbl}>תוקף ההצעה</label><input style={S.inp} type="date" value={f.validUntil} onChange={e => set("validUntil", e.target.value)} dir="ltr" /></div>}
-            {!isTrial && <div><label style={S.lbl}>תוקף החבילה (שבועות)</label><input style={S.inp} type="number" value={f.weeks} onChange={e => set("weeks", Number(e.target.value))} dir="ltr" /></div>}
-            <div><label style={S.lbl}>תאריך חתימה</label><input style={S.inp} type="date" value={f.signDate} onChange={e => set("signDate", e.target.value)} dir="ltr" /></div>
+            {!isSingle && <div><label style={S.lbl}>מספר תשלומים</label><select style={S.inp} value={f.payments} onChange={e => set("payments", Number(e.target.value))}><option value={1}>תשלום אחד</option><option value={2}>2 תשלומים</option><option value={3}>3 תשלומים</option><option value={4}>4 תשלומים</option></select></div>}
+            {!isSingle && <div><label style={S.lbl}>תוקף ההצעה</label><input style={S.inp} type="date" value={f.validUntil} onChange={e => set("validUntil", e.target.value)} dir="ltr" /></div>}
+            {!isSingle && <div><label style={S.lbl}>תוקף החבילה (שבועות)</label><input style={S.inp} type="number" value={f.weeks} onChange={e => set("weeks", Number(e.target.value))} dir="ltr" /></div>}
+            {!isShort && <div><label style={S.lbl}>תאריך חתימה</label><input style={S.inp} type="date" value={f.signDate} onChange={e => set("signDate", e.target.value)} dir="ltr" /></div>}
           </div>
 
-          {!isTrial && f.payments > 1 && <div style={{ marginTop: 10, padding: 10, background: "#0F172A", borderRadius: 8, fontSize: 12 }}>
+          {!isSingle && f.payments > 1 && <div style={{ marginTop: 10, padding: 10, background: "#0F172A", borderRadius: 8, fontSize: 12 }}>
             {splits.map((s, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}><span>{s.when}</span><span style={{ color: "#10B981", fontWeight: 600, direction: "ltr" }}>₪{Math.round(vat * s.pct / 100).toLocaleString()} ({s.pct}%)</span></div>)}
           </div>}
 
           <div style={{ marginTop: 16 }}>
-            <button style={S.btn1} disabled={!f.clientName.trim()} onClick={() => setShowPreview(true)}>צפייה בחוזה ←</button>
+            <button style={S.btn1} disabled={!f.clientName.trim()} onClick={() => setShowPreview(true)}>{isShort ? "צור טקסט ←" : "צפייה בחוזה ←"}</button>
           </div>
         </div>
       ) : (
+        isShort ? (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+            <button style={S.btn2} onClick={() => setShowPreview(false)}>← חזרה לעריכה</button>
+            <button style={S.btn1} onClick={async () => {
+              const txt = buildShortText(f, clauses);
+              try { await navigator.clipboard.writeText(txt); }
+              catch (e) { const ta = document.getElementById("shortTxt"); if (ta) { ta.select(); document.execCommand("copy"); } }
+              setCopied(true); setTimeout(() => setCopied(false), 2500);
+            }}>{copied ? "✓ הועתק" : "📋 העתק"}</button>
+            <span style={{ fontSize: 11, color: "#475569" }}>אפשר גם לערוך כאן לפני ההעתקה</span>
+          </div>
+          <textarea id="shortTxt" readOnly={false} defaultValue={buildShortText(f, clauses)}
+            style={{ ...S.inp, width: "100%", minHeight: "70vh", fontFamily: "inherit", fontSize: 13, lineHeight: 1.8, resize: "vertical", whiteSpace: "pre-wrap" }} />
+        </>
+        ) : (
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button style={S.btn2} onClick={() => setShowPreview(false)}>← חזרה לעריכה</button>
@@ -2178,6 +2251,7 @@ function ContractGenerator({ leads }) {
             />
           </div>
         </>
+        )
       )}
     </div>
   );
