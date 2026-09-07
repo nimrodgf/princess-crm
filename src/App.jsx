@@ -1906,13 +1906,15 @@ html, body { margin: 0; padding: 0; }
 body { font-family: 'Assistant','Rubik',sans-serif; font-size: 10.5pt; line-height: 1.6; color: #111; direction: rtl; background: #fff; }
 table.pw { width: 100%; border-collapse: collapse; }
 table.pw > thead > tr > td,
-table.pw > tbody > tr > td { padding: 0 14mm; border: none; }
-table.pw > thead > tr > td { padding-top: 10mm; padding-bottom: 6mm; }
-table.pw > tbody > tr > td { padding-bottom: 4mm; vertical-align: top; }
+table.pw > tbody > tr > td,
+table.pw > tfoot > tr > td { padding: 0 14mm; border: none; }
+table.pw > thead > tr > td { padding-top: 9mm; padding-bottom: 6mm; }
+table.pw > tbody > tr > td { vertical-align: top; }
+table.pw > tfoot > tr > td { padding-top: 5mm; padding-bottom: 9mm; }
 table.brk { page-break-before: always; break-before: page; }
 .hdr { text-align: center; }
 .hdr img { width: 132px; height: auto; display: inline-block; }
-.ftr { text-align: center; font-size: 8.5pt; color: #777; border-top: 1px solid #e2e2e2; padding: 3mm 14mm 0; }
+.ftr { text-align: center; font-size: 8.5pt; color: #777; border-top: 1px solid #e2e2e2; padding-top: 3mm; }
 .ftr span { unicode-bidi: isolate; }
 h1 { font-size: 16pt; font-weight: 800; text-align: center; margin: 0 0 16px; }
 h2 { font-size: 12.5pt; font-weight: 700; margin: 18px 0 6px; }
@@ -1927,30 +1929,47 @@ ul ul { margin: 4px 0; }
 .sign { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; }
 .sign p { margin: 0 0 5px; }
 @media screen {
-  body { padding-bottom: 0; }
   table.pw { max-width: 210mm; margin: 0 auto; }
   table.brk { border-top: 12px solid #eee; }
-  .ftr { max-width: 210mm; margin: 0 auto 16px; }
 }
 @media print {
-  @page { size: A4; margin: 8mm 8mm 26mm 8mm; }
-  .ftr { position: fixed; bottom: -18mm; right: 0; left: 0; margin: 0; border-top: none; padding-top: 0; }
+  @page { size: A4; margin: 8mm; }
   h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
   li, .sign, .keep { break-inside: avoid; page-break-inside: avoid; }
 }`;
+
+// Fills the remainder of the final page so the footer lands at the page bottom.
+// Bails out unless the fill is clearly safe, so it can never create a blank page.
+const CT_PAD_JS = `
+(function(){
+  function pad(){
+    var MM = 96/25.4, pageH = (297 - 16) * MM;
+    var tails = document.querySelectorAll('.tail');
+    var tail = tails[tails.length - 1];
+    if (!tail) return;
+    var total = document.body.getBoundingClientRect().height;
+    var rem = total % pageH;
+    if (rem < 1) return;
+    var need = pageH - rem;
+    if (need > 60 && need < pageH - 60) tail.style.height = Math.floor(need - 6) + 'px';
+  }
+  if (document.readyState === 'complete') pad();
+  else window.addEventListener('load', pad);
+})();`;
 
 const CT_FOOTER = `<div class="ftr"><span>נימשי</span> | <span dir="ltr">052-2505397</span> | <span dir="ltr">nimrodgf@gmail.com</span></div>`;
 
 function ctPage(bodyHtml, isSecond) {
   return `<table class="pw${isSecond ? " brk" : ""}">
   <thead><tr><td><div class="hdr"><img src="${LOGO_B64}" alt="אולפני הנסיכה"></div></td></tr></thead>
-  <tbody><tr><td>${bodyHtml}</td></tr></tbody>
+  <tfoot><tr><td>${CT_FOOTER}</td></tr></tfoot>
+  <tbody><tr><td>${bodyHtml}<div class="tail"></div></td></tr></tbody>
 </table>`;
 }
 
-function ctDocument(f, clauses) {
+function ctDocument(f, clauses, forPrint) {
   const { part1, part2 } = buildContractHTML(f, clauses);
-  return `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>הסכם - ${f.clientName}</title><style>${CT_CSS}</style></head><body>${CT_FOOTER}${ctPage(part1, false)}${ctPage(part2, true)}</body></html>`;
+  return `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>הסכם - ${f.clientName}</title><style>${CT_CSS}</style></head><body>${ctPage(part1, false)}${ctPage(part2, true)}${forPrint ? "<script>" + CT_PAD_JS + "<\/script>" : ""}</body></html>`;
 }
 
 const CODE = { background: "#1E293B", padding: "1px 5px", borderRadius: 4, fontFamily: "monospace", fontSize: 10, margin: "0 2px", direction: "ltr", display: "inline-block" };
@@ -2050,11 +2069,13 @@ function ContractGenerator({ leads }) {
   const clientNames = [...new Set(leads.map(l => l.name).filter(Boolean))];
 
   const printContract = () => {
-    const doc = ctDocument(f, clauses);
+    const doc = ctDocument(f, clauses, true);
     const w = window.open("", "_blank");
     if (!w) { alert("החלון נחסם. אפשר חלונות קופצים לאתר ונסה שוב."); return; }
     w.document.open(); w.document.write(doc); w.document.close();
-    setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 800);
+    const go = () => { try { w.focus(); w.print(); } catch (e) {} };
+    if (w.document.readyState === "complete") setTimeout(go, 500);
+    else w.addEventListener("load", () => setTimeout(go, 400));
   };
 
   if (mode === "edit") {
