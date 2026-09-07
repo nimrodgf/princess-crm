@@ -1857,6 +1857,22 @@ function substVars(text, vars) {
   return t.replace(/\{\{[^}]*\}\}/g, "");
 }
 
+const HOUR_WORDS = { 3: "שלוש", 4: "ארבע", 5: "חמש", 6: "שש", 7: "שבע", 8: "שמונה", 9: "תשע", 10: "עשר", 11: "אחת עשרה", 12: "שתים עשרה" };
+
+function hoursPhrase(v) {
+  const n = Number(v);
+  if (!n || n <= 0) return "שעת";
+  if (n === 0.5) return "חצי שעת";
+  if (n === 1) return "שעת";
+  if (n === 1.5) return "שעה וחצי";
+  if (n === 2) return "שעתיים";
+  if (n === 2.5) return "שעתיים וחצי";
+  if (Number.isInteger(n)) return (HOUR_WORDS[n] || n) + " שעות";
+  const whole = Math.floor(n);
+  const base = whole === 1 ? "שעה" : whole === 2 ? "שעתיים" : (HOUR_WORDS[whole] || whole) + " שעות";
+  return base + " וחצי";
+}
+
 function buildShortText(f, clauses) {
   const src = (clauses && clauses.length ? clauses : DEFAULT_CLAUSES).find(c => c.slug === "short_text")
     || DEFAULT_CLAUSES.find(c => c.slug === "short_text");
@@ -1864,7 +1880,7 @@ function buildShortText(f, clauses) {
   const fmtIL = d => d ? new Date(d).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" }) : "____";
   return substVars(src ? src.body : "", {
     client: f.clientName || "____", recDate: f.recDate ? fmtIL(f.recDate) : "____",
-    recTime: f.recTime || "____", duration: f.duration || "שעת",
+    recTime: f.recTime || "____", duration: hoursPhrase(f.duration),
     participants: f.participants, price: f.price.toLocaleString(),
     priceVat: vat.toLocaleString(), deliveryHours: f.deliveryHours || 72,
   });
@@ -2065,7 +2081,7 @@ function ContractGenerator({ leads }) {
     clientName: "", episodes: 10, minutes: 60, participants: 4, concentrated: false,
     reelsPer: 1, reelsType: "רגילים", reelLength: 90, subtitles: true,
     price: 7000, payments: 1, validUntil: "", weeks: 26, signDate: new Date().toISOString().split("T")[0],
-    recDate: "", recTime: "", deliveryHours: 72, duration: "שעת",
+    recDate: "", recTime: "", deliveryHours: 72, duration: 1,
   });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const [showPreview, setShowPreview] = useState(false);
@@ -2189,7 +2205,7 @@ function ContractGenerator({ leads }) {
             {isSingle && <div><label style={S.lbl}>שעה</label><input style={S.inp} type="time" value={f.recTime} onChange={e => set("recTime", e.target.value)} dir="ltr" /></div>}
             {!isSingle && <div><label style={S.lbl}>מספר פרקים</label><input style={S.inp} type="number" value={f.episodes} onChange={e => set("episodes", Number(e.target.value))} dir="ltr" /></div>}
             {!isShort && <div><label style={S.lbl}>אורך פרק (דקות)</label><input style={S.inp} type="number" value={f.minutes} onChange={e => set("minutes", Number(e.target.value))} dir="ltr" /></div>}
-            {isShort && <div><label style={S.lbl}>משך הצילום</label><input style={S.inp} value={f.duration} onChange={e => set("duration", e.target.value)} placeholder="שעת / שעתיים" /></div>}
+            {isShort && <div><label style={S.lbl}>משך הצילום (שעות)</label><input style={S.inp} type="number" min="0.5" step="0.5" value={f.duration} onChange={e => set("duration", Number(e.target.value))} dir="ltr" /><div style={{ fontSize: 10, color: "#64748B", marginTop: 3 }}>ייכתב: ל{hoursPhrase(f.duration)} צילום</div></div>}
             <div><label style={S.lbl}>{isSingle ? "מספר משתתפים" : "עד כמה משתתפים"}</label><input style={S.inp} type="number" value={f.participants} onChange={e => set("participants", Number(e.target.value))} dir="ltr" /></div>
             {isSingle && <div><label style={S.lbl}>מסירה (שעות)</label><input style={S.inp} type="number" value={f.deliveryHours} onChange={e => set("deliveryHours", Number(e.target.value))} dir="ltr" /></div>}
             {!isSingle && <div><label style={S.lbl}>ימי צילום</label><select style={S.inp} value={f.concentrated ? "y" : "n"} onChange={e => set("concentrated", e.target.value === "y")}><option value="n">פרק בכל יום</option><option value="y">מרוכזים - לפחות 2 ביום</option></select></div>}
