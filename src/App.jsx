@@ -109,8 +109,22 @@ function PodcastSessions({leadId,sessions,packages,onAdd,onUpdate,onDelete,onAdd
 }
 
 function LeadDetail({lead,interactions,tasks,sessions,packages,onBack,onUpdate,onDelete,onAddInteraction,onUpdateInteraction,onDeleteInteraction,onAddTask,onUpdateTask,onToggleTask,onDeleteTask,onAddSession,onUpdateSession,onDeleteSession,onAddPackage,onUpdatePackage,onDeletePackage}){
-  const [noteText,setNoteText]=useState("");const [noteType,setNoteType]=useState("note");const [noteDate,setNoteDate]=useState(new Date().toISOString().split("T")[0]);const [showTaskForm,setShowTaskForm]=useState(false);const [showEditForm,setShowEditForm]=useState(false);const [editingInteraction,setEditingInteraction]=useState(null);const [editInterText,setEditInterText]=useState("");const [editingTask,setEditingTask]=useState(null);const [editTaskText,setEditTaskText]=useState("");const [showPackage,setShowPackage]=useState(packages.some(p=>p.lead_id===lead.id));const [uploading,setUploading]=useState(false);const [editDeliv,setEditDeliv]=useState(false);const [delivInput,setDelivInput]=useState(lead.deliverables_url||"");
+  const [noteText,setNoteText]=useState("");const [noteType,setNoteType]=useState("note");const [noteDate,setNoteDate]=useState(new Date().toISOString().split("T")[0]);const [showTaskForm,setShowTaskForm]=useState(false);const [showEditForm,setShowEditForm]=useState(false);const [editingInteraction,setEditingInteraction]=useState(null);const [editInterText,setEditInterText]=useState("");const [editingTask,setEditingTask]=useState(null);const [editTaskText,setEditTaskText]=useState("");const [showPackage,setShowPackage]=useState(packages.some(p=>p.lead_id===lead.id));const [uploading,setUploading]=useState(false);const [dragOver,setDragOver]=useState(false);const [editDeliv,setEditDeliv]=useState(false);const [delivInput,setDelivInput]=useState(lead.deliverables_url||"");
   const addNote=async()=>{if(!noteText.trim())return;await onAddInteraction({lead_id:lead.id,text:noteText.trim(),type:noteType,date:new Date(noteDate+"T12:00:00").toISOString()});setNoteText("");setNoteDate(new Date().toISOString().split("T")[0]);};
+  const uploadContract=async(f)=>{
+    if(!f)return;
+    const okExt=["pdf","doc","docx","jpg","jpeg","png"];
+    const ext=(f.name.split(".").pop()||"").toLowerCase();
+    if(!okExt.includes(ext)){alert("סוג קובץ לא נתמך. אפשר PDF, Word או תמונה.");return;}
+    if(f.size>10*1024*1024){alert("הקובץ גדול מ-10MB");return;}
+    setUploading(true);
+    try{
+      const path=`${lead.id}/contract.${ext}`;
+      await sbUpload("contracts",path,f);
+      onUpdate(lead.id,{contract_path:path,contract_name:f.name});
+    }catch(err){alert("שגיאה בהעלאה: "+err.message);}
+    setUploading(false);
+  };
   const leadTasks=tasks.filter(t=>t.lead_id===lead.id).sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));const leadInter=interactions.filter(i=>i.lead_id===lead.id).sort((a,b)=>new Date(b.date)-new Date(a.date));const temp=TEMPS.find(t=>t.id===lead.temperature);
   return(<div style={S.detail}><div style={S.detailTop}><button style={S.backBtn} onClick={onBack}>{I.back} חזרה</button><div style={{display:"flex",gap:6}}><button style={{...S.iconBtn,color:"#8B5CF6"}} onClick={()=>setShowEditForm(true)}>{I.edit}</button><button style={{...S.iconBtn,color:"#EF4444"}} onClick={()=>{if(confirm("למחוק?")){onDelete(lead.id);onBack();}}}>{I.trash}</button></div></div>
   {showEditForm&&<LeadForm initial={{name:lead.name,phone:lead.phone||"",email:lead.email||"",instagram:lead.instagram||"",service:lead.service||"",source:lead.source||"",notes:lead.notes||"",amount:lead.amount||0,status:lead.status||"new",created_at:lead.created_at?lead.created_at.split("T")[0]:""}} onSave={(d)=>{onUpdate(lead.id,d);setShowEditForm(false);}} onClose={()=>setShowEditForm(false)}/>}
@@ -129,19 +143,15 @@ function LeadDetail({lead,interactions,tasks,sessions,packages,onBack,onUpdate,o
         <button style={{...S.btn2,padding:"3px 10px",fontSize:11}} onClick={async()=>{try{const u=await sbSignedUrl("contracts",lead.contract_path);window.open(u,"_blank");}catch(e){alert("שגיאה בפתיחת הקובץ: "+e.message);}}}>פתח</button>
         <button style={{...S.iconBtn,color:"#EF4444",fontSize:11}} onClick={async()=>{if(!confirm("למחוק את החוזה?"))return;await sbDeleteFile("contracts",lead.contract_path);onUpdate(lead.id,{contract_path:"",contract_name:""});}}>{I.trash}</button>
       </>:<>
-        <input type="file" id={`contract_${lead.id}`} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style={{display:"none"}} onChange={async e=>{
-          const f=e.target.files[0]; if(!f) return;
-          if(f.size>10*1024*1024){alert("הקובץ גדול מ-10MB");e.target.value="";return;}
-          setUploading(true);
-          try{
-            const ext=(f.name.split(".").pop()||"pdf").toLowerCase();
-            const path=`${lead.id}/contract.${ext}`;
-            await sbUpload("contracts",path,f);
-            onUpdate(lead.id,{contract_path:path,contract_name:f.name});
-          }catch(err){alert("שגיאה בהעלאה: "+err.message);}
-          setUploading(false); e.target.value="";
-        }}/>
-        <button style={{...S.btn2,padding:"3px 10px",fontSize:11}} disabled={uploading} onClick={()=>document.getElementById(`contract_${lead.id}`).click()}>{uploading?"מעלה...":"📤 העלה חוזה"}</button>
+        <input type="file" id={`contract_${lead.id}`} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style={{display:"none"}} onChange={async e=>{await uploadContract(e.target.files[0]);e.target.value="";}}/>
+        <div
+          onDragOver={e=>{e.preventDefault();if(!dragOver)setDragOver(true);}}
+          onDragLeave={e=>{e.preventDefault();setDragOver(false);}}
+          onDrop={async e=>{e.preventDefault();setDragOver(false);await uploadContract(e.dataTransfer.files[0]);}}
+          onClick={()=>!uploading&&document.getElementById(`contract_${lead.id}`).click()}
+          style={{flex:1,minWidth:180,padding:"10px 14px",borderRadius:8,border:`1px dashed ${dragOver?"#8B5CF6":"#334155"}`,background:dragOver?"#8B5CF615":"transparent",cursor:uploading?"default":"pointer",textAlign:"center",fontSize:12,color:dragOver?"#8B5CF6":"#64748B",transition:"all 0.15s"}}>
+          {uploading?"מעלה...":dragOver?"שחרר כאן":<><span style={{color:"#8B5CF6",fontWeight:600}}>בחר קובץ</span> או גרור לפה</>}
+        </div>
       </>}
     </div>
     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
