@@ -1683,24 +1683,24 @@ const SVC_GROUPS = [
 ];
 
 function Stats({ leads }) {
-  const curYear = String(new Date().getFullYear());
-  const [period, setPeriod] = useState(curYear);
+  const [month, setMonth] = useState("");   // "" = all 12 months
   const [group, setGroup] = useState("all");
+  const [hoverM, setHoverM] = useState(null);
 
-  const selectedMonths = period.includes(",") ? period.split(",") : period.length === 7 ? [period] : [];
-  const toggleMonth = (m, shiftKey) => {
-    if (shiftKey) {
-      const cur = selectedMonths.includes(m) ? selectedMonths.filter(x => x !== m) : [...selectedMonths, m];
-      setPeriod(cur.length ? cur.join(",") : curYear);
-    } else setPeriod(selectedMonths.length === 1 && selectedMonths[0] === m ? curYear : m);
-  };
+  // rolling last 12 months, oldest first
+  const months = useMemo(() => {
+    const out = [], now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+    return out;
+  }, []);
 
   const inPeriod = l => {
-    if (!period) return true;
-    const d = (l.created_at || "").slice(0, 10);
+    const d = (l.created_at || "").slice(0, 7);
     if (!d) return false;
-    if (selectedMonths.length) return selectedMonths.some(m => d.startsWith(m));
-    return d.startsWith(period);
+    return month ? d === month : months.includes(d);
   };
   const inGroup = l => group === "all" ? true
     : group === "podcast" ? PODCAST_SERVICES.has(l.service)
@@ -1758,9 +1758,7 @@ function Stats({ leads }) {
   const topLost = Object.entries(byLostReason).sort((a, b) => b[1] - a[1]);
   const mx = a => a[0]?.[1] || 1;
 
-  const periodLabel = selectedMonths.length === 1 ? new Date(selectedMonths[0] + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })
-    : selectedMonths.length > 1 ? selectedMonths.length + " חודשים"
-    : period ? period : "הכל";
+  const periodLabel = month ? new Date(month + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" }) : "12 חודשים";
 
   return (
     <div style={{ padding: "8px 0 20px" }}>
@@ -1770,18 +1768,64 @@ function Stats({ leads }) {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 3, marginBottom: 4, flexWrap: "wrap", alignItems: "center" }}>
-        <button style={!period ? S.filterOn : S.filterOff} onClick={() => setPeriod("")}>הכל</button>
-        <button style={period === curYear ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setPeriod(curYear)}>שנה נוכחית</button>
-        <span style={{ width: 1, height: 16, background: "#334155", margin: "0 2px" }} />
-        {Array.from({ length: 12 }, (_, i) => {
-          const m = `${curYear}-${String(i + 1).padStart(2, "0")}`;
-          const label = new Date(m + "-01").toLocaleDateString("he-IL", { month: "short" });
-          return <button key={m} style={selectedMonths.includes(m) ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={e => toggleMonth(m, e.shiftKey)}>{label}</button>;
-        })}
-        {selectedMonths.length > 1 && <span style={{ fontSize: 10, color: "#475569" }}>({selectedMonths.length} נבחרו)</span>}
-      </div>
-      <div style={{ fontSize: 10, color: "#334155", marginBottom: 10 }}>Shift+לחיצה לבחירת כמה חודשים</div>
+      {(() => {
+        const inG = l => group === "all" ? true : group === "podcast" ? PODCAST_SERVICES.has(l.service) : !PODCAST_SERVICES.has(l.service);
+        const data = months.map(m => {
+          const ls = leads.filter(l => inG(l) && (l.created_at || "").slice(0, 7) === m);
+          return {
+            m, total: ls.length,
+            closed: ls.filter(l => l.status === "closed").length,
+            lost: ls.filter(l => l.status === "lost").length,
+            open: ls.filter(l => l.status !== "closed" && l.status !== "lost").length,
+          };
+        });
+        const peak = Math.max(...data.map(d => d.total), 1);
+        const H = 110;
+        return (
+          <div style={{ ...S.statCard, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={S.statLbl}>לידים לפי חודש — 12 החודשים האחרונים</div>
+              <div style={{ display: "flex", gap: 10, fontSize: 10, color: "#64748B" }}>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#10B981", marginLeft: 4 }} />נסגר</span>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#EF4444", marginLeft: 4 }} />לא נסגר</span>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#475569", marginLeft: 4 }} />פתוח</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: H + 26 }}>
+              {data.map(d => {
+                const sel = month === d.m, dim = month && !sel;
+                const h = (d.total / peak) * H;
+                const seg = n => d.total ? (n / d.total) * h : 0;
+                return (
+                  <div key={d.m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", opacity: dim ? 0.35 : 1, transition: "opacity .12s" }}
+                    onClick={() => setMonth(sel ? "" : d.m)}
+                    onMouseEnter={() => setHoverM(d.m)} onMouseLeave={() => setHoverM(null)}>
+                    <div style={{ position: "relative", width: "100%", height: H, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                      {hoverM === d.m && d.total > 0 && (
+                        <div style={{ position: "absolute", bottom: h + 4, left: "50%", transform: "translateX(-50%)", background: "#0B1120F0", border: "1px solid #1E293B", borderRadius: 6, padding: "4px 8px", fontSize: 10, whiteSpace: "nowrap", zIndex: 5, lineHeight: 1.5 }}>
+                          <div style={{ fontWeight: 700 }}>{d.total} לידים</div>
+                          {d.closed > 0 && <div style={{ color: "#10B981" }}>{d.closed} נסגרו</div>}
+                          {d.lost > 0 && <div style={{ color: "#EF4444" }}>{d.lost} לא נסגרו</div>}
+                          {d.open > 0 && <div style={{ color: "#94A3B8" }}>{d.open} פתוחים</div>}
+                        </div>
+                      )}
+                      {d.open > 0 && <div style={{ height: seg(d.open), background: "#475569", borderRadius: "3px 3px 0 0" }} />}
+                      {d.lost > 0 && <div style={{ height: seg(d.lost), background: "#EF4444" }} />}
+                      {d.closed > 0 && <div style={{ height: seg(d.closed), background: "#10B981" }} />}
+                      {d.total === 0 && <div style={{ height: 2, background: "#1E293B", borderRadius: 2 }} />}
+                    </div>
+                    <div style={{ fontSize: 9, color: sel ? "#3B82F6" : "#64748B", fontWeight: sel ? 700 : 400, marginTop: 5, whiteSpace: "nowrap" }}>
+                      {new Date(d.m + "-01").toLocaleDateString("he-IL", { month: "short" })}
+                    </div>
+                    <div style={{ fontSize: 10, color: d.total ? "#94A3B8" : "#334155", fontWeight: 600 }}>{d.total || ""}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 10, color: "#334155", marginTop: 6 }}>{month ? "לחיצה על העמודה הנבחרת תחזיר לתצוגת כל החודשים" : "לחיצה על חודש מסננת את הנתונים שמתחת"}</div>
+          </div>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
         <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800 }}>{total}</div><div style={S.statLbl}>לידים — {periodLabel}</div></div>
@@ -2462,7 +2506,7 @@ export default function App(){
   const addPackage=async p=>{try{const [c]=await sb("podcast_packages","POST",p);setPackages(pk=>[c,...pk]);}catch(e){setError(e.message);}};
   const updatePackage=async(id,u)=>{try{const [r]=await sb("podcast_packages","PATCH",u,`?id=eq.${id}`);setPackages(pk=>pk.map(p=>p.id===id?r:p));}catch(e){setError(e.message);}};
   const deletePackage=async id=>{try{await sb("podcast_sessions","DELETE",null,`?package_id=eq.${id}`);await sb("podcast_packages","DELETE",null,`?id=eq.${id}`);setSessions(p=>p.filter(s=>s.package_id!==id));setPackages(pk=>pk.filter(p=>p.id!==id));}catch(e){setError(e.message);}};
-  const filtered=leads.filter(l=>{if(search&&!l.name?.includes(search)&&!l.phone?.includes(search)&&!l.service?.includes(search))return false;if(serviceFilter&&l.service!==serviceFilter)return false;if(statusFilter&&l.status!==statusFilter)return false;if(sourceFilter&&l.source!==sourceFilter)return false;if(lostReasonFilter&&l.lost_reason!==lostReasonFilter)return false;if(taskFilter&&!tasks.some(t=>t.lead_id===l.id&&!t.completed))return false;return true;});
+  const filtered=leads.filter(l=>{if(search&&!l.name?.includes(search)&&!l.phone?.includes(search)&&!l.service?.includes(search))return false;if(serviceFilter&&l.service!==serviceFilter)return false;if(statusFilter&&l.status!==statusFilter)return false;if(sourceFilter==="__none__"){if(l.source)return false;}else if(sourceFilter&&l.source!==sourceFilter)return false;if(lostReasonFilter&&l.lost_reason!==lostReasonFilter)return false;if(taskFilter&&!tasks.some(t=>t.lead_id===l.id&&!t.completed))return false;return true;});
 
   // Section/view sync
   const switchSection = (s) => {
@@ -2523,7 +2567,7 @@ export default function App(){
     </div>
   </div>
 
-  {view==="leads"&&<div style={{display:"flex",gap:4,flexWrap:"wrap",padding:"6px 0",alignItems:"center"}}><button style={!serviceFilter&&!taskFilter&&!statusFilter&&!sourceFilter&&!lostReasonFilter?S.filterOn:S.filterOff} onClick={()=>{setServiceFilter("");setTaskFilter(false);setStatusFilter("");setSourceFilter("");setLostReasonFilter("");}}>הכל</button>{STATUSES.map(s=>{const c=leads.filter(l=>l.status===s.id).length;if(c===0)return null;return <button key={s.id} style={statusFilter===s.id?{...S.filterOn,background:s.color}:S.filterOff} onClick={()=>setStatusFilter(statusFilter===s.id?"":s.id)}>{s.label} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/>{SERVICES.map(svc=>{const c=leads.filter(l=>l.service===svc).length;if(c===0)return null;return <button key={svc} style={serviceFilter===svc?S.filterOn:S.filterOff} onClick={()=>setServiceFilter(serviceFilter===svc?"":svc)}>{svc} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><select style={{...S.inp,width:"auto",padding:"3px 8px",fontSize:12,borderRadius:14,background:sourceFilter?"#F59E0B":"#1E293B",color:sourceFilter?"#fff":"#64748B",border:"none",fontWeight:sourceFilter?600:400}} value={sourceFilter} onChange={e=>setSourceFilter(e.target.value)}><option value="">מקור</option>{SOURCES.map(src=>{const c=leads.filter(l=>l.source===src).length;if(c===0)return null;return <option key={src} value={src}>{src} ({c})</option>;})}</select><select style={{...S.inp,width:"auto",padding:"3px 8px",fontSize:12,borderRadius:14,background:lostReasonFilter?"#EF4444":"#1E293B",color:lostReasonFilter?"#fff":"#64748B",border:"none",fontWeight:lostReasonFilter?600:400}} value={lostReasonFilter} onChange={e=>setLostReasonFilter(e.target.value)}><option value="">סיבת אי-סגירה</option>{LOST_REASONS.map(r=>{const c=leads.filter(l=>l.lost_reason===r).length;if(c===0)return null;return <option key={r} value={r}>{r} ({c})</option>;})}</select><span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><button style={taskFilter?{...S.filterOn,background:"#3B82F6"}:S.filterOff} onClick={()=>setTaskFilter(!taskFilter)}>📋 משימות</button></div>}
+  {view==="leads"&&<div style={{display:"flex",gap:4,flexWrap:"wrap",padding:"6px 0",alignItems:"center"}}><button style={!serviceFilter&&!taskFilter&&!statusFilter&&!sourceFilter&&!lostReasonFilter?S.filterOn:S.filterOff} onClick={()=>{setServiceFilter("");setTaskFilter(false);setStatusFilter("");setSourceFilter("");setLostReasonFilter("");}}>הכל</button>{STATUSES.map(s=>{const c=leads.filter(l=>l.status===s.id).length;if(c===0)return null;return <button key={s.id} style={statusFilter===s.id?{...S.filterOn,background:s.color}:S.filterOff} onClick={()=>setStatusFilter(statusFilter===s.id?"":s.id)}>{s.label} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/>{SERVICES.map(svc=>{const c=leads.filter(l=>l.service===svc).length;if(c===0)return null;return <button key={svc} style={serviceFilter===svc?S.filterOn:S.filterOff} onClick={()=>setServiceFilter(serviceFilter===svc?"":svc)}>{svc} ({c})</button>;})}<span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><select style={{...S.inp,width:"auto",padding:"3px 8px",fontSize:12,borderRadius:14,background:sourceFilter?"#F59E0B":"#1E293B",color:sourceFilter?"#fff":"#64748B",border:"none",fontWeight:sourceFilter?600:400}} value={sourceFilter} onChange={e=>setSourceFilter(e.target.value)}><option value="">מקור</option>{SOURCES.map(src=>{const c=leads.filter(l=>l.source===src).length;if(c===0)return null;return <option key={src} value={src}>{src} ({c})</option>;})}{(()=>{const c=leads.filter(l=>!l.source).length;return c>0?<option value="__none__">⚠ ללא מקור ({c})</option>:null;})()}</select><select style={{...S.inp,width:"auto",padding:"3px 8px",fontSize:12,borderRadius:14,background:lostReasonFilter?"#EF4444":"#1E293B",color:lostReasonFilter?"#fff":"#64748B",border:"none",fontWeight:lostReasonFilter?600:400}} value={lostReasonFilter} onChange={e=>setLostReasonFilter(e.target.value)}><option value="">סיבת אי-סגירה</option>{LOST_REASONS.map(r=>{const c=leads.filter(l=>l.lost_reason===r).length;if(c===0)return null;return <option key={r} value={r}>{r} ({c})</option>;})}</select><span style={{width:1,height:16,background:"#334155",margin:"0 2px"}}/><button style={taskFilter?{...S.filterOn,background:"#3B82F6"}:S.filterOff} onClick={()=>setTaskFilter(!taskFilter)}>📋 משימות</button></div>}
 
   {view==="leads"&&leadsMode==="board"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8,padding:"8px 0 20px",minHeight:400}}>{BOARD_STATUSES.map(status=>{const col=filtered.filter(l=>l.status===status.id);return(<div key={status.id} style={S.col} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(dragId){updateLead(dragId,{status:status.id});setDragId(null);}}}><div style={S.colHead}><span style={{width:8,height:8,borderRadius:"50%",background:status.color}}/><span style={{fontSize:13,fontWeight:700,flex:1}}>{status.label}</span><span style={S.badge}>{col.length}</span></div><div style={{display:"flex",flexDirection:"column",gap:6}}>{col.map(lead=>{const temp=TEMPS.find(t=>t.id===lead.temperature);return(<div key={lead.id} style={{...S.card,cursor:"pointer",borderRight:temp?`3px solid ${temp.color}`:"3px solid transparent"}} draggable onDragStart={()=>setDragId(lead.id)} onDragEnd={()=>setDragId(null)} onClick={()=>setSelectedLead(lead)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:14,fontWeight:600}}>{lead.name}</span>{temp&&<span style={{fontSize:14}}>{temp.emoji}</span>}</div><div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>{lead.service&&<span style={{fontSize:11,background:"#1E293B",color:"#94A3B8",padding:"1px 7px",borderRadius:4}}>{lead.service}</span>}{lead.amount>0&&<span style={{fontSize:11,color:"#10B981",fontWeight:600}}>₪{lead.amount.toLocaleString()}</span>}</div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#475569"}}><span>{lead.source}</span><span>{daysAgo(lead.updated_at)}</span></div></div>);})}{col.length===0&&<div style={{fontSize:12,color:"#334155",textAlign:"center",padding:20}}>אין לידים</div>}</div></div>);})}</div>}
 
