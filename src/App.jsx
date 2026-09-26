@@ -1675,7 +1675,170 @@ function polarToCartesian(cx, cy, r, angleDeg) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-function Stats({leads}){const total=leads.length;const byStatus=STATUSES.map(s=>({...s,count:leads.filter(l=>l.status===s.id).length}));const closed=byStatus.find(s=>s.id==="closed")?.count||0;const lost=byStatus.find(s=>s.id==="lost")?.count||0;const decided=closed+lost;const rate=decided>0?Math.round((closed/decided)*100):0;const revenue=leads.filter(l=>l.status==="closed").reduce((s,l)=>s+(l.amount||0),0);const byService={};leads.forEach(l=>{if(l.service)byService[l.service]=(byService[l.service]||0)+1;});const topSvc=Object.entries(byService).sort((a,b)=>b[1]-a[1]).slice(0,6);const bySource={};leads.forEach(l=>{if(l.source)bySource[l.source]=(bySource[l.source]||0)+1;});const topSrc=Object.entries(bySource).sort((a,b)=>b[1]-a[1]).slice(0,6);const byLostReason={};leads.filter(l=>l.status==="lost").forEach(l=>{const r=l.lost_reason||"לא צוין";byLostReason[r]=(byLostReason[r]||0)+1;});const topLost=Object.entries(byLostReason).sort((a,b)=>b[1]-a[1]);const mx=a=>a[0]?.[1]||1;return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,padding:"8px 0 20px"}}><div style={S.statCard}><div style={{fontSize:36,fontWeight:800}}>{total}</div><div style={S.statLbl}>סה״כ</div></div><div style={S.statCard}><div style={{fontSize:36,fontWeight:800,color:"#10B981"}}>{rate}%</div><div style={S.statLbl}>המרה</div></div><div style={S.statCard}><div style={{fontSize:28,fontWeight:800,color:"#3B82F6"}}>₪{revenue.toLocaleString()}</div><div style={S.statLbl}>הכנסות</div></div><div style={S.statCard}>{byStatus.map(s=><div key={s.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}><span style={{width:8,height:8,borderRadius:"50%",background:s.color}}/><span style={{flex:1}}>{s.label}</span><span style={{fontWeight:700}}>{s.count}</span></div>)}</div>{topSvc.length>0&&<div style={S.statCard}><div style={S.statLbl}>שירותים</div>{topSvc.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}><span style={{minWidth:70}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/mx(topSvc))*100}%`,background:"#3B82F6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:16,textAlign:"center"}}>{c}</span></div>)}</div>}{topSrc.length>0&&<div style={S.statCard}><div style={S.statLbl}>מקורות</div>{topSrc.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}><span style={{minWidth:70}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/mx(topSrc))*100}%`,background:"#8B5CF6",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:16,textAlign:"center"}}>{c}</span></div>)}</div>}{topLost.length>0&&<div style={S.statCard}><div style={S.statLbl}>סיבות אי-סגירה ({lost})</div>{topLost.map(([n,c])=><div key={n} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}><span style={{minWidth:90}}>{n}</span><div style={{flex:1,height:5,background:"#1E293B",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/mx(topLost))*100}%`,background:"#EF4444",borderRadius:3}}/></div><span style={{fontWeight:600,minWidth:16,textAlign:"center"}}>{c}</span><span style={{fontSize:11,color:"#475569",minWidth:32,textAlign:"left"}}>{Math.round((c/lost)*100)}%</span></div>)}</div>}</div>);}
+const PODCAST_SERVICES = new Set(["פודקאסטים", "צילום קורס"]);
+const SVC_GROUPS = [
+  { id: "all", label: "הכל" },
+  { id: "podcast", label: "פודקאסטים וקורסים" },
+  { id: "music", label: "מוזיקה" },
+];
+
+function Stats({ leads }) {
+  const curYear = String(new Date().getFullYear());
+  const [period, setPeriod] = useState(curYear);
+  const [group, setGroup] = useState("all");
+
+  const selectedMonths = period.includes(",") ? period.split(",") : period.length === 7 ? [period] : [];
+  const toggleMonth = (m, shiftKey) => {
+    if (shiftKey) {
+      const cur = selectedMonths.includes(m) ? selectedMonths.filter(x => x !== m) : [...selectedMonths, m];
+      setPeriod(cur.length ? cur.join(",") : curYear);
+    } else setPeriod(selectedMonths.length === 1 && selectedMonths[0] === m ? curYear : m);
+  };
+
+  const inPeriod = l => {
+    if (!period) return true;
+    const d = (l.created_at || "").slice(0, 10);
+    if (!d) return false;
+    if (selectedMonths.length) return selectedMonths.some(m => d.startsWith(m));
+    return d.startsWith(period);
+  };
+  const inGroup = l => group === "all" ? true
+    : group === "podcast" ? PODCAST_SERVICES.has(l.service)
+    : !PODCAST_SERVICES.has(l.service);
+
+  const f = leads.filter(l => inPeriod(l) && inGroup(l));
+
+  const total = f.length;
+  const byStatus = STATUSES.map(s => ({ ...s, count: f.filter(l => l.status === s.id).length }));
+  const closedLeads = f.filter(l => l.status === "closed");
+  const closed = closedLeads.length;
+  const lost = f.filter(l => l.status === "lost").length;
+  const decided = closed + lost;
+  const rate = decided > 0 ? Math.round((closed / decided) * 100) : 0;
+  const revenue = closedLeads.reduce((s, l) => s + (l.amount || 0), 0);
+  const avgDeal = closed > 0 ? Math.round(revenue / closed) : 0;
+
+  // average days from creation to close
+  const closeDays = closedLeads.map(l => {
+    if (!l.created_at || !l.updated_at) return null;
+    const d = (new Date(l.updated_at) - new Date(l.created_at)) / 86400000;
+    return d >= 0 ? d : null;
+  }).filter(d => d !== null);
+  const avgClose = closeDays.length ? Math.round(closeDays.reduce((s, d) => s + d, 0) / closeDays.length) : null;
+
+  // stuck: in progress, untouched a while (ignores the period filter on purpose)
+  const nowMs = Date.now();
+  const stuck = leads.filter(l => l.status === "in_progress" && inGroup(l))
+    .map(l => ({ ...l, days: Math.floor((nowMs - new Date(l.updated_at || l.created_at)) / 86400000) }))
+    .filter(l => l.days >= 14).sort((a, b) => b.days - a.days).slice(0, 8);
+
+  const tally = (keyFn) => {
+    const o = {};
+    f.forEach(l => { const k = keyFn(l); if (k) o[k] = (o[k] || 0) + 1; });
+    return Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  };
+  const topSvc = tally(l => l.service);
+
+  // sources with conversion
+  const srcStats = {};
+  f.forEach(l => {
+    const k = l.source; if (!k) return;
+    if (!srcStats[k]) srcStats[k] = { total: 0, closed: 0, lost: 0, revenue: 0 };
+    srcStats[k].total++;
+    if (l.status === "closed") { srcStats[k].closed++; srcStats[k].revenue += l.amount || 0; }
+    if (l.status === "lost") srcStats[k].lost++;
+  });
+  const srcRows = Object.entries(srcStats).map(([name, v]) => ({
+    name, ...v, dec: v.closed + v.lost,
+    rate: (v.closed + v.lost) > 0 ? Math.round((v.closed / (v.closed + v.lost)) * 100) : null,
+  })).sort((a, b) => (b.rate == null ? -1 : b.rate) - (a.rate == null ? -1 : a.rate) || b.total - a.total);
+
+  const byLostReason = {};
+  f.filter(l => l.status === "lost").forEach(l => { const r = l.lost_reason || "לא צוין"; byLostReason[r] = (byLostReason[r] || 0) + 1; });
+  const topLost = Object.entries(byLostReason).sort((a, b) => b[1] - a[1]);
+  const mx = a => a[0]?.[1] || 1;
+
+  const periodLabel = selectedMonths.length === 1 ? new Date(selectedMonths[0] + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })
+    : selectedMonths.length > 1 ? selectedMonths.length + " חודשים"
+    : period ? period : "הכל";
+
+  return (
+    <div style={{ padding: "8px 0 20px" }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+        {SVC_GROUPS.map(g => (
+          <button key={g.id} onClick={() => setGroup(g.id)} style={{ border: "none", padding: "6px 16px", borderRadius: 10, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: group === g.id ? 700 : 500, background: group === g.id ? "#8B5CF6" : "#1E293B", color: group === g.id ? "#fff" : "#64748B" }}>{g.label}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 3, marginBottom: 4, flexWrap: "wrap", alignItems: "center" }}>
+        <button style={!period ? S.filterOn : S.filterOff} onClick={() => setPeriod("")}>הכל</button>
+        <button style={period === curYear ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={() => setPeriod(curYear)}>שנה נוכחית</button>
+        <span style={{ width: 1, height: 16, background: "#334155", margin: "0 2px" }} />
+        {Array.from({ length: 12 }, (_, i) => {
+          const m = `${curYear}-${String(i + 1).padStart(2, "0")}`;
+          const label = new Date(m + "-01").toLocaleDateString("he-IL", { month: "short" });
+          return <button key={m} style={selectedMonths.includes(m) ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff} onClick={e => toggleMonth(m, e.shiftKey)}>{label}</button>;
+        })}
+        {selectedMonths.length > 1 && <span style={{ fontSize: 10, color: "#475569" }}>({selectedMonths.length} נבחרו)</span>}
+      </div>
+      <div style={{ fontSize: 10, color: "#334155", marginBottom: 10 }}>Shift+לחיצה לבחירת כמה חודשים</div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
+        <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800 }}>{total}</div><div style={S.statLbl}>לידים — {periodLabel}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800, color: "#10B981" }}>{rate}%</div><div style={S.statLbl}>המרה ({closed} מתוך {decided})</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 24, fontWeight: 800, color: "#3B82F6" }}>₪{revenue.toLocaleString()}</div><div style={S.statLbl}>הכנסות{avgDeal > 0 ? ` · ממוצע ₪${avgDeal.toLocaleString()}` : ""}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800, color: avgClose === null ? "#334155" : "#F59E0B" }}>{avgClose === null ? "—" : avgClose}</div><div style={S.statLbl}>ימים לסגירה בממוצע</div></div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 10, marginTop: 10 }}>
+        <div style={S.statCard}>
+          <div style={S.statLbl}>סטטוס</div>
+          {byStatus.map(s => <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "1px 0" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color }} /><span style={{ flex: 1 }}>{s.label}</span><span style={{ fontWeight: 700 }}>{s.count}</span></div>)}
+        </div>
+
+        {topSvc.length > 0 && <div style={S.statCard}>
+          <div style={S.statLbl}>שירותים</div>
+          {topSvc.map(([n, cnt]) => <div key={n} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><span style={{ minWidth: 80 }}>{n}</span><div style={{ flex: 1, height: 5, background: "#1E293B", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: `${(cnt / mx(topSvc)) * 100}%`, background: "#3B82F6", borderRadius: 3 }} /></div><span style={{ fontWeight: 600, minWidth: 16, textAlign: "center" }}>{cnt}</span></div>)}
+        </div>}
+
+        {topLost.length > 0 && <div style={S.statCard}>
+          <div style={S.statLbl}>סיבות אי-סגירה ({lost})</div>
+          {topLost.map(([n, cnt]) => <div key={n} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><span style={{ minWidth: 88 }}>{n}</span><div style={{ flex: 1, height: 5, background: "#1E293B", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: `${(cnt / mx(topLost)) * 100}%`, background: "#EF4444", borderRadius: 3 }} /></div><span style={{ fontWeight: 600, minWidth: 16, textAlign: "center" }}>{cnt}</span><span style={{ fontSize: 11, color: "#475569", minWidth: 30, textAlign: "left" }}>{Math.round((cnt / lost) * 100)}%</span></div>)}
+        </div>}
+      </div>
+
+      {srcRows.length > 0 && <div style={{ ...S.statCard, marginTop: 10 }}>
+        <div style={S.statLbl}>מקורות — נפח מול איכות</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 46px 46px 58px 80px", gap: 6, fontSize: 10, color: "#475569", padding: "4px 0", borderBottom: "1px solid #1E293B" }}>
+          <span>מקור</span><span style={{ textAlign: "center" }}>לידים</span><span style={{ textAlign: "center" }}>נסגרו</span><span style={{ textAlign: "center" }}>המרה</span><span style={{ textAlign: "left" }}>הכנסות</span>
+        </div>
+        {srcRows.map(r => (
+          <div key={r.name} style={{ display: "grid", gridTemplateColumns: "1fr 46px 46px 58px 80px", gap: 6, fontSize: 13, alignItems: "center", padding: "4px 0" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+            <span style={{ textAlign: "center", color: "#94A3B8" }}>{r.total}</span>
+            <span style={{ textAlign: "center", color: "#10B981", fontWeight: 600 }}>{r.closed}</span>
+            <span style={{ textAlign: "center", fontWeight: 700, color: r.rate === null ? "#334155" : r.rate >= 50 ? "#10B981" : r.rate >= 25 ? "#F59E0B" : "#EF4444" }}>{r.rate === null ? "—" : r.rate + "%"}</span>
+            <span style={{ textAlign: "left", color: "#3B82F6", direction: "ltr", fontSize: 12 }}>{r.revenue > 0 ? "₪" + r.revenue.toLocaleString() : ""}</span>
+          </div>
+        ))}
+        <div style={{ fontSize: 10, color: "#334155", marginTop: 6 }}>המרה מחושבת רק מלידים שהוכרעו — נסגרו או לא נסגרו. לידים פתוחים לא נספרים.</div>
+      </div>}
+
+      {stuck.length > 0 && <div style={{ ...S.statCard, marginTop: 10, borderRight: "3px solid #F59E0B" }}>
+        <div style={S.statLbl}>לידים תקועים — בתהליך ולא עודכנו מעל שבועיים</div>
+        {stuck.map(l => (
+          <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 0" }}>
+            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</span>
+            <span style={{ fontSize: 11, color: "#64748B" }}>{l.service || ""}</span>
+            <span style={{ fontWeight: 700, color: l.days >= 30 ? "#EF4444" : "#F59E0B", minWidth: 58, textAlign: "left" }}>{l.days} ימים</span>
+          </div>
+        ))}
+      </div>}
+
+      {total === 0 && <div style={S.empty}>אין לידים בתקופה הזו</div>}
+    </div>
+  );
+}
 
 /* ═══════════════════════
    MAIN APP
