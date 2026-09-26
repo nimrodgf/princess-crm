@@ -133,6 +133,7 @@ function LeadDetail({lead,interactions,tasks,sessions,packages,onBack,onUpdate,o
   <ContactBtns lead={lead}/>
   <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>{lead.service&&<span style={S.chip}>{lead.service}</span>}{lead.source&&<span style={S.chip}>{lead.source}</span>}{lead.amount>0&&<span style={{color:"#10B981",fontWeight:700,fontSize:14}}>₪{lead.amount.toLocaleString()}</span>}</div>
   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{STATUSES.map(s=><button key={s.id} onClick={()=>onUpdate(lead.id,{status:s.id})} style={{border:"none",padding:"5px 14px",borderRadius:20,fontSize:13,cursor:"pointer",fontFamily:"inherit",background:lead.status===s.id?s.color:s.bg,color:lead.status===s.id?"#fff":s.color,fontWeight:lead.status===s.id?700:500}}>{s.label}</button>)}</div>
+  {lead.status==="closed"&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:12,color:"#64748B"}}>נסגר בתאריך:</span><input type="date" style={{...S.inp,width:"auto",padding:"3px 10px",fontSize:12,borderRadius:14}} value={(lead.closed_at||"").slice(0,10)} onChange={e=>onUpdate(lead.id,{closed_at:e.target.value?new Date(e.target.value+"T12:00:00").toISOString():null})} dir="ltr"/>{lead.created_at&&lead.closed_at&&<span style={{fontSize:11,color:"#475569"}}>{Math.max(0,Math.round((new Date(lead.closed_at)-new Date(lead.created_at))/86400000))} ימים מפתיחת הליד</span>}</div>}
   {lead.status==="lost"&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:12,color:"#64748B"}}>סיבה:</span><select style={{...S.inp,width:"auto",padding:"3px 10px",fontSize:12,borderRadius:14}} value={lead.lost_reason||""} onChange={e=>onUpdate(lead.id,{lost_reason:e.target.value})}><option value="">בחר סיבה...</option>{LOST_REASONS.map(r=><option key={r}>{r}</option>)}</select></div>}
   {lead.status==="in_progress"&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center"}}><span style={{fontSize:12,color:"#64748B",marginLeft:6}}>טמפרטורה:</span>{TEMPS.map(t=><button key={t.id} onClick={()=>onUpdate(lead.id,{temperature:lead.temperature===t.id?"":t.id})} style={{border:"none",padding:"3px 10px",borderRadius:12,fontSize:12,cursor:"pointer",fontFamily:"inherit",background:lead.temperature===t.id?t.color:"#1E293B",color:lead.temperature===t.id?"#fff":"#64748B"}}>{t.emoji} {t.label}</button>)}</div>}
   {lead.status==="closed"&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center"}}><span style={{fontSize:12,color:"#64748B",marginLeft:6}}>סטטוס לקוח:</span>{CLIENT_STATUSES.map(cs=><button key={cs.id} onClick={()=>onUpdate(lead.id,{client_status:lead.client_status===cs.id?"":cs.id})} style={{border:"none",padding:"3px 10px",borderRadius:12,fontSize:12,cursor:"pointer",fontFamily:"inherit",background:lead.client_status===cs.id?cs.color:"#1E293B",color:lead.client_status===cs.id?"#fff":"#64748B"}}>{cs.label}</button>)}</div>}
@@ -1728,13 +1729,17 @@ function Stats({ leads, onSelect }) {
   const revenue = closedLeads.reduce((s, l) => s + (l.amount || 0), 0);
   const avgDeal = closed > 0 ? Math.round(revenue / closed) : 0;
 
-  // average days from creation to close
+  // days from creation to close — closed_at is authoritative, updated_at is a fallback estimate
+  const estimated = closedLeads.filter(l => !l.closed_at && l.updated_at).length;
   const closeDays = closedLeads.map(l => {
-    if (!l.created_at || !l.updated_at) return null;
-    const d = (new Date(l.updated_at) - new Date(l.created_at)) / 86400000;
+    const end = l.closed_at || l.updated_at;
+    if (!l.created_at || !end) return null;
+    const d = (new Date(end) - new Date(l.created_at)) / 86400000;
     return d >= 0 ? d : null;
-  }).filter(d => d !== null);
-  const avgClose = closeDays.length ? Math.round(closeDays.reduce((s, d) => s + d, 0) / closeDays.length) : null;
+  }).filter(d => d !== null).sort((a, b) => a - b);
+  const medClose = closeDays.length
+    ? Math.round(closeDays.length % 2 ? closeDays[(closeDays.length - 1) / 2] : (closeDays[closeDays.length / 2 - 1] + closeDays[closeDays.length / 2]) / 2)
+    : null;
 
   // stuck: in progress, untouched a while (ignores the period filter on purpose)
   const nowMs = Date.now();
@@ -1881,7 +1886,10 @@ function Stats({ leads, onSelect }) {
         <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800 }}>{total}</div><div style={S.statLbl}>לידים — {periodLabel}</div></div>
         <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800, color: "#10B981" }}>{rate}%</div><div style={S.statLbl}>המרה ({closed} מתוך {decided})</div></div>
         <div style={S.statCard}><div style={{ fontSize: 24, fontWeight: 800, color: "#3B82F6" }}>₪{revenue.toLocaleString()}</div><div style={S.statLbl}>הכנסות{avgDeal > 0 ? ` · ממוצע ₪${avgDeal.toLocaleString()}` : ""}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800, color: avgClose === null ? "#334155" : "#F59E0B" }}>{avgClose === null ? "—" : avgClose}</div><div style={S.statLbl}>ימים לסגירה בממוצע</div></div>
+        <div style={S.statCard} title={estimated > 0 ? `${estimated} מהעסקאות בלי תאריך סגירה מתועד — מחושבות לפי העדכון האחרון` : undefined}>
+          <div style={{ fontSize: 32, fontWeight: 800, color: medClose === null ? "#334155" : "#F59E0B" }}>{medClose === null ? "—" : medClose}</div>
+          <div style={S.statLbl}>ימים לסגירה (חציון){estimated > 0 ? ` · ${estimated} משוערות` : ""}</div>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 10, marginTop: 10 }}>
@@ -2541,7 +2549,7 @@ export default function App(){
   useEffect(()=>{load();},[load]);
 
   const addLead=async(lead,followup)=>{try{const [c]=await sb("leads","POST",lead);setLeads(p=>[c,...p]);if(followup&&c){const [t]=await sb("tasks","POST",{...followup,lead_id:c.id});setTasks(p=>[...p,t]);sendToCal(`${c.name} — ${followup.title}`,followup.due_date,`טלפון: ${lead.phone||""}`);}}catch(e){setError(e.message);}};
-  const updateLead=async(id,u)=>{try{const [r]=await sb("leads","PATCH",u,`?id=eq.${id}`);setLeads(p=>p.map(l=>l.id===id?r:l));if(selectedLead?.id===id)setSelectedLead(r);}catch(e){setError(e.message);}};
+  const updateLead=async(id,u)=>{try{const prev=leads.find(l=>l.id===id);if(u.status!==undefined&&u.closed_at===undefined){if(u.status==="closed"&&!prev?.closed_at)u={...u,closed_at:new Date().toISOString()};else if(u.status!=="closed"&&prev?.closed_at)u={...u,closed_at:null};}const [r]=await sb("leads","PATCH",u,`?id=eq.${id}`);setLeads(p=>p.map(l=>l.id===id?r:l));if(selectedLead?.id===id)setSelectedLead(r);}catch(e){setError(e.message);}};
   const deleteLead=async id=>{try{await sb("podcast_sessions","DELETE",null,`?lead_id=eq.${id}`);await sb("tasks","DELETE",null,`?lead_id=eq.${id}`);await sb("interactions","DELETE",null,`?lead_id=eq.${id}`);await sb("leads","DELETE",null,`?id=eq.${id}`);setLeads(p=>p.filter(l=>l.id!==id));setInteractions(p=>p.filter(i=>i.lead_id!==id));setTasks(p=>p.filter(t=>t.lead_id!==id));setSessions(p=>p.filter(s=>s.lead_id!==id));}catch(e){setError(e.message);}};
   const addInteraction=async i=>{try{const [c]=await sb("interactions","POST",i);setInteractions(p=>[c,...p]);}catch(e){setError(e.message);}};
   const updateInteraction=async(id,u)=>{try{const [r]=await sb("interactions","PATCH",u,`?id=eq.${id}`);setInteractions(p=>p.map(i=>i.id===id?r:i));}catch(e){setError(e.message);}};
