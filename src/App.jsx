@@ -1683,19 +1683,29 @@ const SVC_GROUPS = [
 ];
 
 function Stats({ leads }) {
-  const [month, setMonth] = useState("");   // "" = all 12 months
+  const [month, setMonth] = useState("");   // "" = whole period
   const [group, setGroup] = useState("all");
   const [hoverM, setHoverM] = useState(null);
+  const [span, setSpan] = useState("12m"); // 12m | year | all
 
-  // rolling last 12 months, oldest first
   const months = useMemo(() => {
-    const out = [], now = new Date();
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    const now = new Date(), out = [];
+    const push = d => out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    if (span === "year") {
+      for (let m = 0; m < 12; m++) push(new Date(now.getFullYear(), m, 1));
+    } else if (span === "all") {
+      const dates = leads.map(l => (l.created_at || "").slice(0, 7)).filter(Boolean).sort();
+      const first = dates[0] || `${now.getFullYear()}-01`;
+      let d = new Date(Number(first.slice(0, 4)), Number(first.slice(5, 7)) - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 1);
+      while (d <= end) { push(d); d = new Date(d.getFullYear(), d.getMonth() + 1, 1); }
+    } else {
+      for (let i = 11; i >= 0; i--) push(new Date(now.getFullYear(), now.getMonth() - i, 1));
     }
     return out;
-  }, []);
+  }, [span, leads]);
+
+  useEffect(() => { setMonth(""); }, [span]);
 
   const inPeriod = l => {
     const d = (l.created_at || "").slice(0, 7);
@@ -1758,13 +1768,19 @@ function Stats({ leads }) {
   const topLost = Object.entries(byLostReason).sort((a, b) => b[1] - a[1]);
   const mx = a => a[0]?.[1] || 1;
 
-  const periodLabel = month ? new Date(month + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" }) : "12 חודשים";
+  const periodLabel = month ? new Date(month + "-01").toLocaleDateString("he-IL", { month: "long", year: "numeric" })
+    : span === "year" ? "שנה נוכחית" : span === "all" ? "כל התקופה" : "12 חודשים";
 
   return (
     <div style={{ padding: "8px 0 20px" }}>
-      <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
         {SVC_GROUPS.map(g => (
           <button key={g.id} onClick={() => setGroup(g.id)} style={{ border: "none", padding: "6px 16px", borderRadius: 10, fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: group === g.id ? 700 : 500, background: group === g.id ? "#8B5CF6" : "#1E293B", color: group === g.id ? "#fff" : "#64748B" }}>{g.label}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
+        {[{ id: "12m", label: "12 חודשים אחרונים" }, { id: "year", label: "שנה נוכחית" }, { id: "all", label: "הכל" }].map(p => (
+          <button key={p.id} onClick={() => setSpan(p.id)} style={span === p.id ? { ...S.filterOn, background: "#3B82F6" } : S.filterOff}>{p.label}</button>
         ))}
       </div>
 
@@ -1784,7 +1800,7 @@ function Stats({ leads }) {
         return (
           <div style={{ ...S.statCard, marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={S.statLbl}>לידים לפי חודש — 12 החודשים האחרונים</div>
+              <div style={S.statLbl}>לידים לפי חודש — {span === "year" ? "שנה נוכחית" : span === "all" ? "כל התקופה" : "12 החודשים האחרונים"}</div>
               <div style={{ display: "flex", gap: 10, fontSize: 10, color: "#64748B" }}>
                 <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#10B981", marginLeft: 4 }} />נסגר</span>
                 <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "#EF4444", marginLeft: 4 }} />לא נסגר</span>
@@ -1815,7 +1831,9 @@ function Stats({ leads }) {
                       {d.total === 0 && <div style={{ height: 2, background: "#1E293B", borderRadius: 2 }} />}
                     </div>
                     <div style={{ fontSize: 9, color: sel ? "#3B82F6" : "#64748B", fontWeight: sel ? 700 : 400, marginTop: 5, whiteSpace: "nowrap" }}>
-                      {new Date(d.m + "-01").toLocaleDateString("he-IL", { month: "short" })}
+                      {data.length <= 14 || d.m.endsWith("-01") || d.m.endsWith("-07") || sel
+                        ? new Date(d.m + "-01").toLocaleDateString("he-IL", d.m.endsWith("-01") && data.length > 14 ? { month: "short", year: "2-digit" } : { month: "short" })
+                        : ""}
                     </div>
                     <div style={{ fontSize: 10, color: d.total ? "#94A3B8" : "#334155", fontWeight: 600 }}>{d.total || ""}</div>
                   </div>
@@ -1826,6 +1844,38 @@ function Stats({ leads }) {
           </div>
         );
       })()}
+
+      {month && (
+        <div style={{ ...S.statCard, marginBottom: 10, borderRight: "3px solid #3B82F6" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <div style={S.statLbl}>לידים ב{periodLabel} ({f.length})</div>
+            <span style={{ flex: 1 }} />
+            <button style={{ ...S.btn2, padding: "3px 10px", fontSize: 11 }} onClick={() => setMonth("")}>נקה בחירה</button>
+          </div>
+          {f.length === 0 ? <div style={{ fontSize: 12, color: "#475569" }}>אין לידים בחודש הזה</div> : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr>{["שם", "שירות", "מקור", "סטטוס", "סכום", "תאריך"].map(h => <th key={h} style={{ ...S.th, whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {[...f].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).map(l => {
+                    const st = STATUSES.find(x => x.id === l.status);
+                    return (
+                      <tr key={l.id}>
+                        <td style={{ ...S.td, fontWeight: 600 }}>{l.name}</td>
+                        <td style={S.td}>{l.service || "—"}</td>
+                        <td style={{ ...S.td, color: l.source ? undefined : "#EF4444" }}>{l.source || "ללא מקור"}</td>
+                        <td style={S.td}>{st && <span style={{ background: st.bg, color: st.color, padding: "2px 9px", borderRadius: 12, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>{st.label}</span>}</td>
+                        <td style={{ ...S.td, direction: "ltr", textAlign: "right" }}>{l.amount > 0 ? `₪${l.amount.toLocaleString()}` : "—"}</td>
+                        <td style={{ ...S.td, whiteSpace: "nowrap", color: "#64748B" }}>{fmtDate(l.created_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
         <div style={S.statCard}><div style={{ fontSize: 32, fontWeight: 800 }}>{total}</div><div style={S.statLbl}>לידים — {periodLabel}</div></div>
@@ -2585,7 +2635,7 @@ export default function App(){
       return 0;
     });
     const cols=[{key:"name",label:"שם"},{key:"phone",label:"טלפון"},{key:"service",label:"שירות"},{key:"status",label:"סטטוס"},{key:"source",label:"מקור"},{key:"amount",label:"סכום"},{key:"created_at",label:"תאריך"},{key:"updated_at",label:"עדכון"}];
-    return <div style={{overflowX:"auto",padding:"8px 0 20px"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{cols.map(c=><th key={c.key} style={{...S.th,cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}} onClick={()=>toggleSort(c.key)}>{c.label}{arrow(c.key)}</th>)}</tr></thead><tbody>{sorted.map(lead=>{const s=STATUSES.find(x=>x.id===lead.status);const temp=TEMPS.find(t=>t.id===lead.temperature);return(<tr key={lead.id} style={{cursor:"pointer"}} onClick={()=>setSelectedLead(lead)}><td style={S.td}><strong>{lead.name}</strong> {temp?temp.emoji:""}</td><td style={{...S.td,direction:"ltr",textAlign:"right"}}>{lead.phone}</td><td style={S.td}>{lead.service}</td><td style={S.td}><span style={{background:s.bg,color:s.color,padding:"2px 10px",borderRadius:12,fontSize:12,fontWeight:600}}>{s.label}</span></td><td style={S.td}>{lead.source}</td><td style={S.td}>{lead.amount>0?`₪${lead.amount.toLocaleString()}`:"—"}</td><td style={S.td}>{fmtDate(lead.created_at)}</td><td style={S.td}>{daysAgo(lead.updated_at)}</td></tr>);})}</tbody></table>{sorted.length===0&&<div style={S.empty}>אין לידים</div>}</div>;
+    return <div style={{overflowX:"auto",padding:"8px 0 20px"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{cols.map(c=><th key={c.key} style={{...S.th,cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}} onClick={()=>toggleSort(c.key)}>{c.label}{arrow(c.key)}</th>)}</tr></thead><tbody>{sorted.map(lead=>{const s=STATUSES.find(x=>x.id===lead.status);const temp=TEMPS.find(t=>t.id===lead.temperature);const ly=Number((lead.created_at||"").slice(0,4))||new Date().getFullYear();const band=(new Date().getFullYear()-ly)%2===1;return(<tr key={lead.id} style={{cursor:"pointer",background:band?"#0F172A":"transparent"}} onClick={()=>setSelectedLead(lead)}><td style={S.td}><strong>{lead.name}</strong> {temp?temp.emoji:""}</td><td style={{...S.td,direction:"ltr",textAlign:"right"}}>{lead.phone}</td><td style={S.td}>{lead.service}</td><td style={S.td}><span style={{background:s.bg,color:s.color,padding:"2px 10px",borderRadius:12,fontSize:12,fontWeight:600}}>{s.label}</span></td><td style={S.td}>{lead.source}</td><td style={S.td}>{lead.amount>0?`₪${lead.amount.toLocaleString()}`:"—"}</td><td style={S.td}>{fmtDate(lead.created_at)}</td><td style={S.td}>{daysAgo(lead.updated_at)}</td></tr>);})}</tbody></table>{sorted.length===0&&<div style={S.empty}>אין לידים</div>}</div>;
   })()}
 
   {view==="clients"&&<ClientsView leads={leads} onSelect={setSelectedLead}/>}
