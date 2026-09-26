@@ -1682,7 +1682,7 @@ const SVC_GROUPS = [
   { id: "music", label: "מוזיקה" },
 ];
 
-function Stats({ leads }) {
+function Stats({ leads, onSelect }) {
   const [month, setMonth] = useState("");   // "" = whole period
   const [group, setGroup] = useState("all");
   const [hoverM, setHoverM] = useState(null);
@@ -1860,8 +1860,8 @@ function Stats({ leads }) {
                   {[...f].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).map(l => {
                     const st = STATUSES.find(x => x.id === l.status);
                     return (
-                      <tr key={l.id}>
-                        <td style={{ ...S.td, fontWeight: 600 }}>{l.name}</td>
+                      <tr key={l.id} style={onSelect ? { cursor: "pointer" } : undefined} onClick={onSelect ? () => onSelect(l) : undefined}>
+                        <td style={{ ...S.td, fontWeight: 600, color: onSelect ? "#3B82F6" : undefined }}>{l.name}</td>
                         <td style={S.td}>{l.service || "—"}</td>
                         <td style={{ ...S.td, color: l.source ? undefined : "#EF4444" }}>{l.source || "ללא מקור"}</td>
                         <td style={S.td}>{st && <span style={{ background: st.bg, color: st.color, padding: "2px 9px", borderRadius: 12, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>{st.label}</span>}</td>
@@ -2645,7 +2645,7 @@ export default function App(){
   {view==="cashflow_shared"&&<CashflowView leads={leads} accountId="shared" key="shared"/>}
   {view==="cashflow_cash"&&<CashflowView leads={leads} accountId="cash" key="cash"/>}
   {view==="dashboard"&&<DashboardView/>}
-  {view==="stats"&&<Stats leads={leads}/>}
+  {view==="stats"&&<Stats leads={leads} onSelect={setSelectedLead}/>}
   {view==="contracts"&&<ContractGenerator leads={leads}/>}
   {showForm&&<LeadForm onSave={addLead} onClose={()=>setShowForm(false)}/>}
   {showNotifs&&<NotifPanel notifs={notifs} onClose={()=>setShowNotifs(false)} onSelect={id=>{const l=leads.find(x=>x.id===id);if(l)setSelectedLead(l);}} onDismiss={()=>setNotifRefresh(r=>r+1)}/>}
