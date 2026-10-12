@@ -3,14 +3,59 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 const SUPABASE_URL = "https://lbqscxwfttiduofjjmyt.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxicXNjeHdmdHRpZHVvZmpqbXl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MzUwNTksImV4cCI6MjA5NDAxMTA1OX0.pPFtxoO5UhRt_UFxJxFOy8zbwLK4OXnk6lxRUGhZack";
 const GCAL_URL = "https://script.google.com/macros/s/AKfycbyFyUmXAmlQCuZHgtAKu_0Zc_b3eEDf_u32oCYdNqLAK6t3ktlNktf2tJ-hPhvXgq8N9w/exec";
-const hdrs = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" };
-async function sb(table, method = "GET", body = null, query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { method, headers: hdrs, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
-async function sbMoneyman(query = "") { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { headers: { ...hdrs, "Accept-Profile": "moneyman", "Range": "0-9999" } }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
-async function sbMoneymanWrite(method, query = "", body = null) { const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { method, headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman" }, ...(body ? { body: JSON.stringify(body) } : {}) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return true; }
+// ---- auth ----
+const SESSION_KEY = "princess_session";
+let _session = null;
+try { _session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch (e) { _session = null; }
+let _onAuthLost = () => {};
+const authToken = () => (_session && _session.access_token) || SUPABASE_KEY;
+const saveSession = s => { _session = s; if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s)); else localStorage.removeItem(SESSION_KEY); };
+
+async function authSignIn(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST", headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error_description || d.msg || d.message || "התחברות נכשלה");
+  saveSession(d); return d;
+}
+async function authRefresh() {
+  if (!_session || !_session.refresh_token) return null;
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST", headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: _session.refresh_token }),
+  });
+  if (!res.ok) { saveSession(null); return null; }
+  const d = await res.json(); saveSession(d); return d;
+}
+function authSignOut() { saveSession(null); }
+
+// Base headers always carry the current token; sb() retries once after a refresh.
+const baseHdrs = extra => ({ apikey: SUPABASE_KEY, Authorization: `Bearer ${authToken()}`, ...extra });
+const hdrs = new Proxy({}, {
+  get(_, k) { return baseHdrs({ "Content-Type": "application/json", Prefer: "return=representation" })[k]; },
+  ownKeys() { return ["apikey", "Authorization", "Content-Type", "Prefer"]; },
+  getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; },
+});
+
+async function authedFetch(url, opts = {}, extraHeaders = {}) {
+  const build = () => ({ ...opts, headers: { ...baseHdrs(extraHeaders), ...(opts.headers || {}) } });
+  let res = await fetch(url, build());
+  if ((res.status === 401 || res.status === 403) && _session) {
+    const r = await authRefresh();
+    if (r) res = await fetch(url, build());
+    else { _onAuthLost(); }
+  }
+  return res;
+}
+async function sb(table, method = "GET", body = null, query = "") { const res = await authedFetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }, { "Content-Type": "application/json", Prefer: "return=representation" }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
+async function sbMoneyman(query = "") { const res = await authedFetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, {}, { "Content-Type": "application/json", Prefer: "return=representation", "Accept-Profile": "moneyman", "Range": "0-9999" }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const t = await res.text(); return t ? JSON.parse(t) : null; }
+async function sbMoneymanWrite(method, query = "", body = null) { const res = await authedFetch(`${SUPABASE_URL}/rest/v1/transactions${query}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }, { "Content-Type": "application/json", Prefer: "return=representation", "Accept-Profile": "moneyman", "Content-Profile": "moneyman" }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return true; }
 function encPath(p) { return String(p).split("/").map(encodeURIComponent).join("/"); }
-async function sbUpload(bucket, path, file) { const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encPath(path)}`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" }, body: file }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return path; }
-async function sbSignedUrl(bucket, path, expiresIn = 3600) { const res = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${encPath(path)}`, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn }) }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const d = await res.json(); const su = d.signedURL || d.signedUrl; if (!su) throw new Error("לא התקבל קישור חתום"); return su.startsWith("http") ? su : `${SUPABASE_URL}/storage/v1${su.startsWith("/") ? "" : "/"}${su}`; }
-async function sbDeleteFile(bucket, path) { const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encPath(path)}`, { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }); return res.ok; }
+async function sbUpload(bucket, path, file) { const res = await authedFetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encPath(path)}`, { method: "POST", body: file }, { "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); return path; }
+async function sbSignedUrl(bucket, path, expiresIn = 3600) { const res = await authedFetch(`${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${encPath(path)}`, { method: "POST", body: JSON.stringify({ expiresIn }) }, { "Content-Type": "application/json" }); if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`); const d = await res.json(); const su = d.signedURL || d.signedUrl; if (!su) throw new Error("לא התקבל קישור חתום"); return su.startsWith("http") ? su : `${SUPABASE_URL}/storage/v1${su.startsWith("/") ? "" : "/"}${su}`; }
+async function sbDeleteFile(bucket, path) { const res = await authedFetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encPath(path)}`, { method: "DELETE" }); return res.ok; }
 async function addToCalendar(title, start, desc = "") { try { const r = await fetch(GCAL_URL, { method: "POST", body: JSON.stringify({ title, start, description: desc, duration: 30 }) }); return (await r.json()).success; } catch { return false; } }
 
 const STATUSES = [{ id: "new", label: "ליד חדש", color: "#8B5CF6", bg: "#8B5CF615" }, { id: "in_progress", label: "בתהליך", color: "#3B82F6", bg: "#3B82F615" }, { id: "frozen", label: "בהקפאה", color: "#64748B", bg: "#64748B15" }, { id: "closed", label: "נסגר ✓", color: "#10B981", bg: "#10B98115" }, { id: "lost", label: "לא נסגר", color: "#EF4444", bg: "#EF444415" }];
@@ -963,11 +1008,9 @@ function CashflowView({ leads, accountId = "biz" }) {
             const beforeTxns = await sbMoneyman(`?company_id=eq.hapoalim&account=eq.${expectedAcct}&select=unique_id&limit=5000`);
             const beforeCount = (beforeTxns || []).length;
             // Bulk insert with duplicate ignore
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?on_conflict=unique_id`, {
-              method: "POST",
-              headers: { ...hdrs, "Accept-Profile": "moneyman", "Content-Profile": "moneyman", "Prefer": "resolution=ignore-duplicates" },
-              body: JSON.stringify(inserts)
-            });
+            const res = await authedFetch(`${SUPABASE_URL}/rest/v1/transactions?on_conflict=unique_id`, {
+              method: "POST", body: JSON.stringify(inserts)
+            }, { "Content-Type": "application/json", "Accept-Profile": "moneyman", "Content-Profile": "moneyman", "Prefer": "resolution=ignore-duplicates" });
             if (!res.ok) { const err = await res.text(); _showToast("שגיאה: " + err.slice(0, 100), "error"); e.target.value = ""; return; }
             // Count after
             const freshTxns = await sbMoneyman("?order=activity_date.desc&limit=5000");
@@ -1683,7 +1726,7 @@ const SVC_GROUPS = [
   { id: "music", label: "מוזיקה" },
 ];
 
-function Stats({ leads, onSelect }) {
+function Stats({ leads, interactions = [], onSelect }) {
   const [month, setMonth] = useState("");   // "" = whole period
   const [group, setGroup] = useState("all");
   const [hoverM, setHoverM] = useState(null);
@@ -1743,8 +1786,13 @@ function Stats({ leads, onSelect }) {
 
   // stuck: in progress, untouched a while (ignores the period filter on purpose)
   const nowMs = Date.now();
+  const lastInter = {};
+  interactions.forEach(i => { const d = i.date || i.created_at; if (!i.lead_id || !d) return; if (!lastInter[i.lead_id] || d > lastInter[i.lead_id]) lastInter[i.lead_id] = d; });
   const stuck = leads.filter(l => l.status === "in_progress" && inGroup(l))
-    .map(l => ({ ...l, days: Math.floor((nowMs - new Date(l.updated_at || l.created_at)) / 86400000) }))
+    .map(l => {
+      const a = l.updated_at || l.created_at || "", b = lastInter[l.id] || "";
+      return { ...l, days: Math.floor((nowMs - new Date(a > b ? a : b)) / 86400000) };
+    })
     .filter(l => l.days >= 14).sort((a, b) => b.days - a.days).slice(0, 8);
 
   const tally = (keyFn) => {
@@ -2539,7 +2587,49 @@ function ContractGenerator({ leads }) {
   );
 }
 
+function LoginScreen({ onIn }) {
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    if (!email.trim() || !pw) return;
+    setBusy(true); setErr("");
+    try { await authSignIn(email, pw); onIn(); }
+    catch (e) { setErr(e.message === "Invalid login credentials" ? "אימייל או סיסמה שגויים" : e.message); }
+    setBusy(false);
+  };
+  return (
+    <div style={{ ...S.app, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+      <div style={{ ...S.statCard, width: "100%", maxWidth: 340 }}>
+        <div style={{ textAlign: "center", marginBottom: 18 }}>
+          <div style={{ fontSize: 26 }}>🎤</div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>אולפני הנסיכה</div>
+        </div>
+        <label style={S.lbl}>אימייל</label>
+        <input style={{ ...S.inp, marginBottom: 10 }} type="email" value={email} autoComplete="username"
+          onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && go()} dir="ltr" />
+        <label style={S.lbl}>סיסמה</label>
+        <input style={{ ...S.inp, marginBottom: 12 }} type="password" value={pw} autoComplete="current-password"
+          onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && go()} dir="ltr" />
+        {err && <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 10 }}>{err}</div>}
+        <button style={{ ...S.btn1, width: "100%" }} disabled={busy || !email.trim() || !pw} onClick={go}>
+          {busy ? "מתחבר..." : "כניסה"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
+  const [authed,setAuthed]=useState(!!_session);
+  useEffect(()=>{_onAuthLost=()=>{authSignOut();setAuthed(false);};return()=>{_onAuthLost=()=>{};};},[]);
+  useEffect(()=>{if(!authed)return;authRefresh();const t=setInterval(()=>{authRefresh();},45*60*1000);return()=>clearInterval(t);},[authed]);
+  if(!authed)return <LoginScreen onIn={()=>setAuthed(true)}/>;
+  return <AppInner onOut={()=>{authSignOut();setAuthed(false);}}/>;
+}
+
+function AppInner({onOut}){
   const [leads,setLeads]=useState([]);const [interactions,setInteractions]=useState([]);const [tasks,setTasks]=useState([]);const [sessions,setSessions]=useState([]);const [packages,setPackages]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState(null);
   const [section,setSection]=useState("crm");
   const [view,setView]=useState("leads");
@@ -2564,6 +2654,8 @@ export default function App(){
   const addPackage=async p=>{try{const [c]=await sb("podcast_packages","POST",p);setPackages(pk=>[c,...pk]);}catch(e){setError(e.message);}};
   const updatePackage=async(id,u)=>{try{const [r]=await sb("podcast_packages","PATCH",u,`?id=eq.${id}`);setPackages(pk=>pk.map(p=>p.id===id?r:p));}catch(e){setError(e.message);}};
   const deletePackage=async id=>{try{await sb("podcast_sessions","DELETE",null,`?package_id=eq.${id}`);await sb("podcast_packages","DELETE",null,`?id=eq.${id}`);setSessions(p=>p.filter(s=>s.package_id!==id));setPackages(pk=>pk.filter(p=>p.id!==id));}catch(e){setError(e.message);}};
+  const lastTouch=useMemo(()=>{const m={};interactions.forEach(i=>{if(!i.lead_id)return;const d=i.date||i.created_at;if(!d)return;if(!m[i.lead_id]||d>m[i.lead_id])m[i.lead_id]=d;});return m;},[interactions]);
+  const touchedAt=l=>{const a=l.updated_at||"",b=lastTouch[l.id]||"";return a>b?a:b;};
   const filtered=leads.filter(l=>{if(search&&!l.name?.includes(search)&&!l.phone?.includes(search)&&!l.service?.includes(search))return false;if(serviceFilter&&l.service!==serviceFilter)return false;if(statusFilter&&l.status!==statusFilter)return false;if(sourceFilter==="__none__"){if(l.source)return false;}else if(sourceFilter&&l.source!==sourceFilter)return false;if(lostReasonFilter&&l.lost_reason!==lostReasonFilter)return false;if(taskFilter&&!tasks.some(t=>t.lead_id===l.id&&!t.completed))return false;return true;});
 
   // Section/view sync
@@ -2601,6 +2693,7 @@ export default function App(){
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
         <button style={{...S.iconBtn,position:"relative"}} onClick={()=>setShowNotifs(true)}>{I.bell}{notifs.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#EF4444",color:"#fff",fontSize:10,fontWeight:700,width:16,height:16,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{notifs.length}</span>}</button>
         {section==="crm"&&<button style={S.addBtn} onClick={()=>setShowForm(true)}>{I.plus} ליד חדש</button>}
+        <button style={{...S.iconBtn,fontSize:12,color:"#64748B"}} title="התנתקות" onClick={()=>{if(confirm("להתנתק מהמערכת?"))onOut();}}>⏻</button>
       </div>
     </div>
     {/* Section selector */}
@@ -2636,14 +2729,15 @@ export default function App(){
       let va=a[sortCol],vb=b[sortCol];
       if(sortCol==="name"){va=(va||"").toLowerCase();vb=(vb||"").toLowerCase();}
       if(sortCol==="amount"){va=Number(va)||0;vb=Number(vb)||0;}
-      if(sortCol==="created_at"||sortCol==="updated_at"){va=va||"";vb=vb||"";}
+      if(sortCol==="updated_at"){va=touchedAt(a);vb=touchedAt(b);}
+      if(sortCol==="created_at"){va=va||"";vb=vb||"";}
       if(sortCol==="status"){const order={new:0,in_progress:1,frozen:2,closed:3,lost:4};va=order[va]??5;vb=order[vb]??5;}
       if(va<vb)return sortDir==="asc"?-1:1;
       if(va>vb)return sortDir==="asc"?1:-1;
       return 0;
     });
     const cols=[{key:"name",label:"שם"},{key:"phone",label:"טלפון"},{key:"service",label:"שירות"},{key:"status",label:"סטטוס"},{key:"source",label:"מקור"},{key:"amount",label:"סכום"},{key:"created_at",label:"תאריך"},{key:"updated_at",label:"עדכון"}];
-    return <div style={{overflowX:"auto",padding:"8px 0 20px"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{cols.map(c=><th key={c.key} style={{...S.th,cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}} onClick={()=>toggleSort(c.key)}>{c.label}{arrow(c.key)}</th>)}</tr></thead><tbody>{sorted.map(lead=>{const s=STATUSES.find(x=>x.id===lead.status);const temp=TEMPS.find(t=>t.id===lead.temperature);const ly=Number((lead.created_at||"").slice(0,4))||new Date().getFullYear();const band=(new Date().getFullYear()-ly)%2===1;return(<tr key={lead.id} style={{cursor:"pointer",background:band?"#0F172A":"transparent"}} onClick={()=>setSelectedLead(lead)}><td style={S.td}><strong>{lead.name}</strong> {temp?temp.emoji:""}</td><td style={{...S.td,direction:"ltr",textAlign:"right"}}>{lead.phone}</td><td style={S.td}>{lead.service}</td><td style={S.td}><span style={{background:s.bg,color:s.color,padding:"2px 10px",borderRadius:12,fontSize:12,fontWeight:600}}>{s.label}</span></td><td style={S.td}>{lead.source}</td><td style={S.td}>{lead.amount>0?`₪${lead.amount.toLocaleString()}`:"—"}</td><td style={S.td}>{fmtDate(lead.created_at)}</td><td style={S.td}>{daysAgo(lead.updated_at)}</td></tr>);})}</tbody></table>{sorted.length===0&&<div style={S.empty}>אין לידים</div>}</div>;
+    return <div style={{overflowX:"auto",padding:"8px 0 20px"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr>{cols.map(c=><th key={c.key} style={{...S.th,cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}} onClick={()=>toggleSort(c.key)}>{c.label}{arrow(c.key)}</th>)}</tr></thead><tbody>{sorted.map(lead=>{const s=STATUSES.find(x=>x.id===lead.status);const temp=TEMPS.find(t=>t.id===lead.temperature);const ly=Number((lead.created_at||"").slice(0,4))||new Date().getFullYear();const band=(new Date().getFullYear()-ly)%2===1;return(<tr key={lead.id} style={{cursor:"pointer",background:band?"#0F172A":"transparent"}} onClick={()=>setSelectedLead(lead)}><td style={S.td}><strong>{lead.name}</strong> {temp?temp.emoji:""}</td><td style={{...S.td,direction:"ltr",textAlign:"right"}}>{lead.phone}</td><td style={S.td}>{lead.service}</td><td style={S.td}><span style={{background:s.bg,color:s.color,padding:"2px 10px",borderRadius:12,fontSize:12,fontWeight:600}}>{s.label}</span></td><td style={S.td}>{lead.source}</td><td style={S.td}>{lead.amount>0?`₪${lead.amount.toLocaleString()}`:"—"}</td><td style={S.td}>{fmtDate(lead.created_at)}</td><td style={S.td}>{(()=>{const t=touchedAt(lead);const fromInter=(lastTouch[lead.id]||"")>(lead.updated_at||"");return <span title={fromInter?"לפי אינטראקציה אחרונה":"לפי עדכון הכרטיס"}>{daysAgo(t)}{fromInter&&<span style={{color:"#3B82F6",fontSize:10,marginRight:3}}>💬</span>}</span>;})()}</td></tr>);})}</tbody></table>{sorted.length===0&&<div style={S.empty}>אין לידים</div>}</div>;
   })()}
 
   {view==="clients"&&<ClientsView leads={leads} onSelect={setSelectedLead}/>}
@@ -2653,7 +2747,7 @@ export default function App(){
   {view==="cashflow_shared"&&<CashflowView leads={leads} accountId="shared" key="shared"/>}
   {view==="cashflow_cash"&&<CashflowView leads={leads} accountId="cash" key="cash"/>}
   {view==="dashboard"&&<DashboardView/>}
-  {view==="stats"&&<Stats leads={leads} onSelect={setSelectedLead}/>}
+  {view==="stats"&&<Stats leads={leads} interactions={interactions} onSelect={setSelectedLead}/>}
   {view==="contracts"&&<ContractGenerator leads={leads}/>}
   {showForm&&<LeadForm onSave={addLead} onClose={()=>setShowForm(false)}/>}
   {showNotifs&&<NotifPanel notifs={notifs} onClose={()=>setShowNotifs(false)} onSelect={id=>{const l=leads.find(x=>x.id===id);if(l)setSelectedLead(l);}} onDismiss={()=>setNotifRefresh(r=>r+1)}/>}
