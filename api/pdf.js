@@ -5,7 +5,9 @@ const CHROMIUM_VERSION = process.env.CHROMIUM_VERSION || "133.0.0";
 const PACK_URL = `https://github.com/Sparticuz/chromium/releases/download/v${CHROMIUM_VERSION}/chromium-v${CHROMIUM_VERSION}-pack.tar`;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://lbqscxwfttiduofjjmyt.supabase.co";
-const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || "";
+// המפתח האנונימי ציבורי (מוטמע גם באפליקציה). משתנה הסביבה קודם; אם Supabase דוחה אותו, משתמשים במובנה
+const BUILTIN_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxicXNjeHdmdHRpZHVvZmpqbXl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MzUwNTksImV4cCI6MjA5NDAxMTA1OX0.pPFtxoO5UhRt_UFxJxFOy8zbwLK4OXnk6lxRUGhZack";
+const SUPABASE_ANONS = [...new Set([(process.env.SUPABASE_ANON_KEY || "").trim().replace(/^['"]|['"]$/g, ""), BUILTIN_ANON].filter(Boolean))];
 
 // מוודא שהבקשה הגיעה ממשתמש מחובר, כדי שהנקודה לא תהיה פתוחה לכל העולם
 // מחזיר null כשהבקשה מורשית, אחרת סיבת הדחייה
@@ -13,13 +15,18 @@ async function verifyUser(req) {
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ")) return "missing token";
   const token = auth.slice(7);
-  if (!SUPABASE_ANON) return null; // לא הוגדר מפתח — מדלגים על הבדיקה
-  try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${token}` },
-    });
-    return r.ok ? null : `supabase ${r.status}`;
-  } catch (e) { return "supabase unreachable"; }
+  let reason = "supabase unreachable";
+  for (const apikey of SUPABASE_ANONS) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey, Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) return null;
+      reason = `supabase ${r.status}`;
+      if (r.status !== 401) return reason; // טוקן משתמש לא תקין — אין טעם לנסות מפתח אחר
+    } catch (e) { reason = "supabase unreachable"; }
+  }
+  return reason;
 }
 
 export default async function handler(req, res) {
