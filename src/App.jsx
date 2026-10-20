@@ -182,6 +182,7 @@ function LeadDetail({lead,interactions,tasks,sessions,packages,onBack,onUpdate,o
   {lead.status==="lost"&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:12,color:"#64748B"}}>סיבה:</span><select style={{...S.inp,width:"auto",padding:"3px 10px",fontSize:12,borderRadius:14}} value={lead.lost_reason||""} onChange={e=>onUpdate(lead.id,{lost_reason:e.target.value})}><option value="">בחר סיבה...</option>{LOST_REASONS.map(r=><option key={r}>{r}</option>)}</select></div>}
   {lead.status==="in_progress"&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center"}}><span style={{fontSize:12,color:"#64748B",marginLeft:6}}>טמפרטורה:</span>{TEMPS.map(t=><button key={t.id} onClick={()=>onUpdate(lead.id,{temperature:lead.temperature===t.id?"":t.id})} style={{border:"none",padding:"3px 10px",borderRadius:12,fontSize:12,cursor:"pointer",fontFamily:"inherit",background:lead.temperature===t.id?t.color:"#1E293B",color:lead.temperature===t.id?"#fff":"#64748B"}}>{t.emoji} {t.label}</button>)}</div>}
   {lead.status==="closed"&&<div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center"}}><span style={{fontSize:12,color:"#64748B",marginLeft:6}}>סטטוס לקוח:</span>{CLIENT_STATUSES.map(cs=><button key={cs.id} onClick={()=>onUpdate(lead.id,{client_status:lead.client_status===cs.id?"":cs.id})} style={{border:"none",padding:"3px 10px",borderRadius:12,fontSize:12,cursor:"pointer",fontFamily:"inherit",background:lead.client_status===cs.id?cs.color:"#1E293B",color:lead.client_status===cs.id?"#fff":"#64748B"}}>{cs.label}</button>)}</div>}
+  <LeadDocuments lead={lead}/>
   {lead.status==="closed"&&<div style={{marginBottom:8,paddingTop:8,borderTop:"1px solid #1E293B",display:"flex",flexDirection:"column",gap:6}}>
     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
       <span style={{fontSize:12,color:"#64748B",minWidth:52}}>חוזה:</span>
@@ -2481,8 +2482,8 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-function ContractGenerator({ leads }) {
-  const [f, setF] = useState({
+function ContractGenerator({ leads, lead, initialForm, onSavePdf }) {
+  const [f, setF] = useState(() => ({
     contractType: "package",
     clientName: "", episodes: 10, minutes: 60, participants: 4, concentrated: false,
     reelsPer: 1, reelsType: "רגילים", reelLength: 90, subtitles: true,
@@ -2494,7 +2495,9 @@ function ContractGenerator({ leads }) {
     qItems: [{ desc: "", qty: 1, unit: "" }],
     qExtras: [],
     qNote: "",
-  });
+    ...(lead ? { clientName: lead.name } : {}),
+    ...(initialForm || {}),
+  }));
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const [showPreview, setShowPreview] = useState(false);
   const [mode, setMode] = useState("form");
@@ -2565,7 +2568,8 @@ function ContractGenerator({ leads }) {
     try {
       const blob = await renderPdfBlob(ctDocument(f, clauses, false), docName());
       downloadBlob(blob, docName() + ".pdf");
-      _showToast("✓ הקובץ נוצר");
+      if (onSavePdf) { await onSavePdf(blob, f, docName()); }
+      else _showToast("✓ הקובץ נוצר");
     } catch (e) {
       _showToast("יצירת PDF נכשלה: " + e.message + " — אפשר להשתמש בהדפסה", "error");
     }
@@ -2739,7 +2743,7 @@ function ContractGenerator({ leads }) {
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button style={S.btn2} onClick={() => setShowPreview(false)}>← חזרה לעריכה</button>
-            <button style={S.btn1} disabled={pdfBusy} onClick={savePdf}>{pdfBusy ? "מייצר..." : "📄 הורד PDF"}</button>
+            <button style={S.btn1} disabled={pdfBusy} onClick={savePdf}>{pdfBusy ? "מייצר..." : onSavePdf ? "📄 הורד ושמור בכרטיס" : "📄 הורד PDF"}</button>
             <button style={S.btn2} onClick={printContract}>🖨 הדפסה</button>
           </div>
           <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
@@ -2751,6 +2755,119 @@ function ContractGenerator({ leads }) {
           </div>
         </>
         )
+      )}
+    </div>
+  );
+}
+
+// מסמכי לקוח: רשימה, יצירה מתוך הכרטיס (נשמר אוטומטית), העלאה ידנית, עריכה ומחיקה
+function LeadDocuments({ lead }) {
+  const [docs, setDocs] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [modal, setModal] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoaded(false);
+    sb("lead_documents", "GET", null, `?lead_id=eq.${lead.id}&order=created_at.desc`)
+      .then(r => { if (alive) { setDocs(r || []); setLoaded(true); } })
+      .catch(() => { if (alive) setLoaded(true); });
+    return () => { alive = false; };
+  }, [lead.id]);
+
+  const typeLabel = d => d.doc_type === "upload" ? "קובץ" : (CONTRACT_TYPES.find(t => t.id === d.doc_type) || {}).label || "מסמך";
+
+  const saveGenerated = async (blob, f, name) => {
+    const existing = modal && modal.doc;
+    try {
+      const id = existing ? existing.id : crypto.randomUUID();
+      const path = existing ? existing.file_path : `${lead.id}/docs/${id}.pdf`;
+      await sbUpload("contracts", path, new File([blob], name + ".pdf", { type: "application/pdf" }));
+      const fields = { doc_type: f.contractType, title: name, file_name: name + ".pdf", form: f, updated_at: new Date().toISOString() };
+      if (existing) {
+        const [r] = await sb("lead_documents", "PATCH", fields, `?id=eq.${id}`);
+        setDocs(p => p.map(x => x.id === id ? r : x));
+      } else {
+        const [r] = await sb("lead_documents", "POST", { id, lead_id: lead.id, file_path: path, ...fields });
+        setDocs(p => [r, ...p]);
+      }
+      setModal(null);
+      _showToast("✓ הקובץ ירד למחשב ונשמר בכרטיס הלקוח");
+    } catch (e) {
+      _showToast("הקובץ ירד למחשב, אבל השמירה בכרטיס נכשלה: " + e.message, "error");
+    }
+  };
+
+  const uploadFile = async (file) => {
+    if (!file) return;
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (!["pdf", "doc", "docx", "jpg", "jpeg", "png"].includes(ext)) { alert("סוג קובץ לא נתמך. אפשר PDF, Word או תמונה."); return; }
+    if (file.size > 10 * 1024 * 1024) { alert("הקובץ גדול מ-10MB"); return; }
+    setUploading(true);
+    try {
+      const id = crypto.randomUUID();
+      const path = `${lead.id}/docs/${id}.${ext}`;
+      await sbUpload("contracts", path, file);
+      const [r] = await sb("lead_documents", "POST", { id, lead_id: lead.id, doc_type: "upload", title: file.name.replace(/\.[^.]+$/, ""), file_path: path, file_name: file.name });
+      setDocs(p => [r, ...p]);
+      _showToast("✓ הקובץ נוסף לכרטיס");
+    } catch (e) { alert("שגיאה בהעלאה: " + e.message); }
+    setUploading(false);
+  };
+
+  const openDoc = async (d) => {
+    try { window.open(await sbSignedUrl("contracts", d.file_path), "_blank"); }
+    catch (e) { alert("שגיאה בפתיחת הקובץ: " + e.message); }
+  };
+
+  const editDoc = async (d) => {
+    if (d.form) { setModal({ doc: d }); return; }
+    const t = prompt("שם המסמך:", d.title);
+    if (!t || !t.trim() || t.trim() === d.title) return;
+    try { const [r] = await sb("lead_documents", "PATCH", { title: t.trim(), updated_at: new Date().toISOString() }, `?id=eq.${d.id}`); setDocs(p => p.map(x => x.id === d.id ? r : x)); }
+    catch (e) { alert("שגיאה: " + e.message); }
+  };
+
+  const delDoc = async (d) => {
+    if (!confirm(`למחוק את "${d.title}"?`)) return;
+    try {
+      await sb("lead_documents", "DELETE", null, `?id=eq.${d.id}`);
+      await sbDeleteFile("contracts", d.file_path);
+      setDocs(p => p.filter(x => x.id !== d.id));
+    } catch (e) { alert("שגיאה במחיקה: " + e.message); }
+  };
+
+  return (
+    <div style={{ marginBottom: 8, paddingTop: 8, borderTop: "1px solid #1E293B" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>📎 מסמכים{docs.length > 0 ? ` (${docs.length})` : ""}</span>
+        <button style={{ ...S.btn1, padding: "4px 12px", fontSize: 12 }} onClick={() => setModal({})}>＋ צור מסמך</button>
+        <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style={{ display: "none" }} onChange={async e => { await uploadFile(e.target.files[0]); e.target.value = ""; }} />
+        <button style={{ ...S.btn2, padding: "4px 12px", fontSize: 12 }} disabled={uploading} onClick={() => fileRef.current && fileRef.current.click()}>{uploading ? "מעלה..." : "⬆ העלה קובץ"}</button>
+      </div>
+      {loaded && docs.length === 0 && <div style={{ fontSize: 12, color: "#475569" }}>אין מסמכים עדיין</div>}
+      {docs.map(d => (
+        <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #111827", flexWrap: "wrap" }}>
+          <span style={{ ...S.chip, fontSize: 11 }}>{typeLabel(d)}</span>
+          <span style={{ fontSize: 13, color: "#E2E8F0", flex: 1, minWidth: 140 }}>{d.title}</span>
+          <span style={{ fontSize: 11, color: "#64748B" }}>{fmtDate(d.created_at)}</span>
+          <button style={{ ...S.btn2, padding: "3px 10px", fontSize: 11 }} onClick={() => openDoc(d)}>פתח</button>
+          <button style={{ ...S.btn2, padding: "3px 10px", fontSize: 11 }} onClick={() => editDoc(d)}>{d.form ? "ערוך" : "שנה שם"}</button>
+          <button style={{ ...S.iconBtn, color: "#EF4444", fontSize: 11 }} onClick={() => delDoc(d)}>{I.trash}</button>
+        </div>
+      ))}
+      {modal && (
+        <div style={{ ...S.overlay, alignItems: "flex-start", overflowY: "auto" }}>
+          <div style={{ background: "#0B1120", borderRadius: 14, padding: 16, width: "100%", maxWidth: 900, direction: "rtl" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>{modal.doc ? "עריכת מסמך" : "מסמך חדש"} · {lead.name}</span>
+              <button style={S.btn2} onClick={() => setModal(null)}>✕ סגור</button>
+            </div>
+            <ContractGenerator leads={[lead]} lead={lead} initialForm={modal.doc ? modal.doc.form : null} onSavePdf={saveGenerated} />
+          </div>
+        </div>
       )}
     </div>
   );
