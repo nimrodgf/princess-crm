@@ -2234,13 +2234,12 @@ function buildQuoteHTML(f) {
   <th>תאריך</th><td>${fmtIL(f.qDate)}</td>
 </tr></table>
 ${greeting ? `<p class="greet">${esc2(greeting)}</p>` : ""}
-${bullets.length ? `<h2>על מה דיברנו</h2><ul>${bullets.map((b, i) => `<li${i === 0 ? ' class="first"' : ""}>${esc2(b)}</li>`).join("")}</ul>` : ""}
+${bullets.length ? `<h2>על מה דיברנו</h2><ul>${bullets.map(b => `<li>${esc2(b)}</li>`).join("")}</ul>` : ""}
 ${items.length || extras.length ? `<h2>פירוט עלויות</h2>
 <table class="cost">
   <thead><tr><th class="desc">תיאור השירות</th><th>כמות</th><th>מחיר ליחידה</th><th>סה״כ</th><th>סה״כ כולל מע״מ</th></tr></thead>
   <tbody>${rows}${totalRow}${extraRows}</tbody>
-</table>
-<p class="vatnote">כל המחירים לפני מע״מ</p>` : ""}
+</table>` : ""}
 ${f.qNote ? `<p class="qnote">${esc2(f.qNote)}</p>` : ""}
 </div>`;
 }
@@ -2367,11 +2366,12 @@ ul ul { margin: 4px 0; }
 .q table.cost thead th.desc { text-align: right; }
 .q table.cost td { padding: 7px 8px; border-bottom: 1px solid #e3e8e5; text-align: center; }
 .q table.cost td.desc { text-align: right; }
-.q table.cost tr.tot td { font-weight: 700; border-top: 1.5px solid #1f3d2f; }
-.q p.vatnote { text-align: center; font-weight: 700; font-size: 9.5pt; color: #1f3d2f; margin: 6px 0 0; }
+.q table.cost tbody tr:nth-child(even) td { background: #eef3f0; }
+.q table.cost tr.tot td { font-weight: 700; border-top: 1.5px solid #1f3d2f; background: #fff; }
+.q { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .q p.qnote { font-weight: 700; text-align: center; margin: 18px 0 0; padding-top: 12px; border-top: 1px solid #d4ded8; }
 .q ul { margin: 6px 0 0; padding-right: 22px; }
-.q li.first { list-style: "✦  "; }
+.q li { list-style: "✦  "; }
 .sign p { margin: 0 0 5px; }
 @media screen {
   table.pw { max-width: 210mm; margin: 0 auto; }
