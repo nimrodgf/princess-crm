@@ -2458,6 +2458,29 @@ function ClauseEditor({ clause, onSave, onReset, saving }) {
   );
 }
 
+// מייצר PDF בשרת ומחזיר Blob — אותו HTML בדיוק שההדפסה משתמשת בו
+async function renderPdfBlob(html, filename) {
+  const res = await fetch("/api/pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
+    body: JSON.stringify({ html, filename }),
+  });
+  if (!res.ok) {
+    let msg = res.status + "";
+    try { const j = await res.json(); if (j.error) msg = j.error; } catch (e) {}
+    throw new Error(msg);
+  }
+  return await res.blob();
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
 function ContractGenerator({ leads }) {
   const [f, setF] = useState({
     contractType: "package",
@@ -2476,6 +2499,7 @@ function ContractGenerator({ leads }) {
   const [showPreview, setShowPreview] = useState(false);
   const [mode, setMode] = useState("form");
   const [copied, setCopied] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [clauses, setClauses] = useState(DEFAULT_CLAUSES);
   const [dbReady, setDbReady] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2533,6 +2557,20 @@ function ContractGenerator({ leads }) {
   const vat = Math.round(f.price * 1.18);
   const splits = PAY_SPLITS[f.payments] || PAY_SPLITS[1];
   const clientNames = [...new Set(leads.map(l => l.name).filter(Boolean))];
+
+  const docName = () => `${f.contractType === "quote" ? "הצעת מחיר" : "הסכם"} - ${f.clientName || "ללא שם"}`;
+
+  const savePdf = async () => {
+    setPdfBusy(true);
+    try {
+      const blob = await renderPdfBlob(ctDocument(f, clauses, false), docName());
+      downloadBlob(blob, docName() + ".pdf");
+      _showToast("✓ הקובץ נוצר");
+    } catch (e) {
+      _showToast("יצירת PDF נכשלה: " + e.message + " — אפשר להשתמש בהדפסה", "error");
+    }
+    setPdfBusy(false);
+  };
 
   const printContract = () => {
     const doc = ctDocument(f, clauses, true);
@@ -2701,7 +2739,8 @@ function ContractGenerator({ leads }) {
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button style={S.btn2} onClick={() => setShowPreview(false)}>← חזרה לעריכה</button>
-            <button style={S.btn1} onClick={printContract}>🖨 הדפס / שמור כ-PDF</button>
+            <button style={S.btn1} disabled={pdfBusy} onClick={savePdf}>{pdfBusy ? "מייצר..." : "📄 הורד PDF"}</button>
+            <button style={S.btn2} onClick={printContract}>🖨 הדפסה</button>
           </div>
           <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
             <iframe
