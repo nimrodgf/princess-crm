@@ -99,13 +99,13 @@ function ContactBtns({ lead }) { return (<div style={{ display: "flex", gap: 6, 
 
 function LeadForm({ onSave, onClose, initial }) {
   const isEdit = !!initial;
-  const [f, setF] = useState(initial || { name:"",phone:"",email:"",instagram:"",service:"",source:"",notes:"",amount:"",status:"new",created_at:"",lost_reason:"",closed_at:"" });
+  const [f, setF] = useState(initial || { name:"",phone:"",email:"",instagram:"",service:"",source:"",notes:"",amount:"",status:"in_progress",created_at:"",lost_reason:"",closed_at:"" });
   const [addFollowup,setAddFollowup] = useState(!isEdit);
   const [followupDays,setFollowupDays] = useState(2);
   const ref = useRef(); useEffect(()=>{ref.current?.focus();},[]);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const submit=()=>{if(!f.name.trim())return;const dd=new Date();dd.setDate(dd.getDate()+followupDays);dd.setHours(10,0,0,0);const data={...f,name:f.name.trim(),amount:f.amount?Number(f.amount):0};if(f.created_at)data.created_at=new Date(f.created_at+"T12:00:00").toISOString();else delete data.created_at;const cd=(f.closed_at||"").slice(0,10);if(f.status==="closed")data.closed_at=/^(19|20)\d{2}-\d{2}-\d{2}$/.test(cd)?new Date(cd+"T12:00:00").toISOString():(initial&&initial.closed_at)||new Date().toISOString();else data.closed_at=null;onSave(data,!isEdit&&addFollowup?{title:"פולואפ",type:"followup",due_date:dd.toISOString(),completed:false}:null);onClose();};
-  return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>{isEdit?"עריכת ליד":"ליד חדש"}</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={S.grid2}><div style={S.full}><label style={S.lbl}>שם *</label><input ref={ref} style={S.inp} value={f.name} onChange={e=>set("name",e.target.value)} placeholder="שם" onKeyDown={e=>e.key==="Enter"&&submit()}/></div><div><label style={S.lbl}>טלפון</label><input style={S.inp} value={f.phone} onChange={e=>set("phone",e.target.value)} placeholder="050-0000000" dir="ltr"/></div><div><label style={S.lbl}>אימייל</label><input style={S.inp} value={f.email} onChange={e=>set("email",e.target.value)} placeholder="email@example.com" dir="ltr"/></div><div><label style={S.lbl}>אינסטגרם</label><input style={S.inp} value={f.instagram||""} onChange={e=>set("instagram",e.target.value)} placeholder="@username" dir="ltr"/></div><div><label style={S.lbl}>שירות</label><select style={S.inp} value={f.service} onChange={e=>set("service",e.target.value)}><option value="">בחר...</option>{SERVICES.map(s=><option key={s}>{s}</option>)}</select></div><div><label style={S.lbl}>מקור</label><select style={S.inp} value={f.source} onChange={e=>set("source",e.target.value)}><option value="">בחר...</option>{SOURCES.map(s=><option key={s}>{s}</option>)}</select></div><div><label style={S.lbl}>סטטוס</label><select style={S.inp} value={f.status||"new"} onChange={e=>set("status",e.target.value)}>{STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>{f.status==="lost"&&<div><label style={S.lbl}>סיבה</label><select style={S.inp} value={f.lost_reason||""} onChange={e=>set("lost_reason",e.target.value)}><option value="">בחר...</option>{LOST_REASONS.map(r=><option key={r}>{r}</option>)}</select></div>}{f.status==="closed"&&<div><label style={S.lbl}>נסגר בתאריך</label><input style={S.inp} type="date" value={(f.closed_at||"").slice(0,10)} onChange={e=>set("closed_at",e.target.value)} dir="ltr"/></div>}<div><label style={S.lbl}>סכום (₪)</label><input style={S.inp} type="number" value={f.amount} onChange={e=>set("amount",e.target.value)} dir="ltr"/></div><div><label style={S.lbl}>תאריך{isEdit?"":" (ברירת מחדל: היום)"}</label><input style={S.inp} type="date" value={f.created_at||""} onChange={e=>set("created_at",e.target.value)} dir="ltr"/></div><div style={S.full}><label style={S.lbl}>הערות</label><textarea style={{...S.inp,minHeight:50,resize:"vertical"}} value={f.notes} onChange={e=>set("notes",e.target.value)}/></div>{!isEdit&&<div style={{...S.full,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,paddingTop:8,borderTop:"1px solid #334155"}}><label style={{...S.lbl,display:"flex",alignItems:"center",gap:8,cursor:"pointer",margin:0}}><input type="checkbox" checked={addFollowup} onChange={e=>setAddFollowup(e.target.checked)} style={{accentColor:"#8B5CF6",width:16,height:16}}/>צור פולואפ</label>{addFollowup&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:13,color:"#94A3B8"}}>בעוד</span><input type="number" value={followupDays} onChange={e=>setFollowupDays(Number(e.target.value))} style={{...S.inp,width:50,textAlign:"center",padding:"4px 6px"}} min={1} dir="ltr"/><span style={{fontSize:13,color:"#94A3B8"}}>ימים</span></div>}</div>}</div><div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.name.trim()}>{isEdit?"שמור שינויים":"שמור ליד"}</button></div></Modal>);
+  return(<Modal onClose={onClose}><div style={S.mHead}><h2 style={S.mTitle}>{isEdit?"עריכת ליד":"ליד חדש"}</h2><button style={S.iconBtn} onClick={onClose}>{I.x}</button></div><div style={S.grid2}><div style={S.full}><label style={S.lbl}>שם *</label><input ref={ref} style={S.inp} value={f.name} onChange={e=>set("name",e.target.value)} placeholder="שם" onKeyDown={e=>e.key==="Enter"&&submit()}/></div><div><label style={S.lbl}>טלפון</label><input style={S.inp} value={f.phone} onChange={e=>set("phone",e.target.value)} placeholder="050-0000000" dir="ltr"/></div><div><label style={S.lbl}>אימייל</label><input style={S.inp} value={f.email} onChange={e=>set("email",e.target.value)} placeholder="email@example.com" dir="ltr"/></div><div><label style={S.lbl}>אינסטגרם</label><input style={S.inp} value={f.instagram||""} onChange={e=>set("instagram",e.target.value)} placeholder="@username" dir="ltr"/></div><div><label style={S.lbl}>שירות</label><select style={S.inp} value={f.service} onChange={e=>set("service",e.target.value)}><option value="">בחר...</option>{SERVICES.map(s=><option key={s}>{s}</option>)}</select></div><div><label style={S.lbl}>מקור</label><select style={S.inp} value={f.source} onChange={e=>set("source",e.target.value)}><option value="">בחר...</option>{SOURCES.map(s=><option key={s}>{s}</option>)}</select></div><div><label style={S.lbl}>סטטוס</label><select style={S.inp} value={f.status||"in_progress"} onChange={e=>set("status",e.target.value)}>{STATUSES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div>{f.status==="lost"&&<div><label style={S.lbl}>סיבה</label><select style={S.inp} value={f.lost_reason||""} onChange={e=>set("lost_reason",e.target.value)}><option value="">בחר...</option>{LOST_REASONS.map(r=><option key={r}>{r}</option>)}</select></div>}{f.status==="closed"&&<div><label style={S.lbl}>נסגר בתאריך</label><input style={S.inp} type="date" value={(f.closed_at||"").slice(0,10)} onChange={e=>set("closed_at",e.target.value)} dir="ltr"/></div>}<div><label style={S.lbl}>סכום (₪)</label><input style={S.inp} type="number" value={f.amount} onChange={e=>set("amount",e.target.value)} dir="ltr"/></div><div><label style={S.lbl}>תאריך{isEdit?"":" (ברירת מחדל: היום)"}</label><input style={S.inp} type="date" value={f.created_at||""} onChange={e=>set("created_at",e.target.value)} dir="ltr"/></div><div style={S.full}><label style={S.lbl}>הערות</label><textarea style={{...S.inp,minHeight:50,resize:"vertical"}} value={f.notes} onChange={e=>set("notes",e.target.value)}/></div>{!isEdit&&<div style={{...S.full,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,paddingTop:8,borderTop:"1px solid #334155"}}><label style={{...S.lbl,display:"flex",alignItems:"center",gap:8,cursor:"pointer",margin:0}}><input type="checkbox" checked={addFollowup} onChange={e=>setAddFollowup(e.target.checked)} style={{accentColor:"#8B5CF6",width:16,height:16}}/>צור פולואפ</label>{addFollowup&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:13,color:"#94A3B8"}}>בעוד</span><input type="number" value={followupDays} onChange={e=>setFollowupDays(Number(e.target.value))} style={{...S.inp,width:50,textAlign:"center",padding:"4px 6px"}} min={1} dir="ltr"/><span style={{fontSize:13,color:"#94A3B8"}}>ימים</span></div>}</div>}</div><div style={S.mFoot}><button style={S.btn2} onClick={onClose}>ביטול</button><button style={S.btn1} onClick={submit} disabled={!f.name.trim()}>{isEdit?"שמור שינויים":"שמור ליד"}</button></div></Modal>);
 }
 
 function TaskForm({ leadId, leadName, onSave, onClose }) {
@@ -2005,7 +2005,7 @@ const PAY_SPLITS = {
 };
 
 const CLAUSE_VARS = ["client","episodes","minutes","participants","weeks","price","priceVat","validUntil","signDate","reelsPer","reelLength","recDate","recTime","deliveryHours","duration"];
-const CONTRACT_TYPES = [{ id: "package", label: "חבילה" }, { id: "trial", label: "פרק ניסיון" }, { id: "short", label: "נוסח מקוצר" }];
+const CONTRACT_TYPES = [{ id: "quote", label: "הצעת מחיר" }, { id: "package", label: "חבילה" }, { id: "trial", label: "פרק ניסיון" }, { id: "short", label: "נוסח מקוצר" }];
 
 const DEFAULT_CLAUSES = [
   { slug: "intro", kind: "package", part: 1, sort: 10, title: "מה סיכמנו", body:
@@ -2199,6 +2199,51 @@ function buildShortText(f, clauses) {
   });
 }
 
+
+const QUOTE_FOOTER = `<div class="ftr"><div style="font-weight:700">אולפני הנסיכה · מושב אודים · <span dir="ltr">052-2505397</span></div><div><span dir="ltr">ulpaneyprincess@gmail.com</span> | <span dir="ltr">www.ulpaneyprincess.com</span></div></div>`;
+
+function buildQuoteHTML(f) {
+  const fmtIL = d => d ? new Date(d).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "____";
+  const esc2 = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const nis = n => Math.round(n).toLocaleString() + "₪";
+
+  const items = (f.qItems || []).filter(i => (i.desc || "").trim());
+  const extras = (f.qExtras || []).filter(i => (i.desc || "").trim());
+  const sub = items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unit) || 0), 0);
+  const withVat = Math.round(sub * 1.18);
+
+  const bullets = String(f.qBullets || "").split("\n").map(s => s.trim()).filter(Boolean);
+  const greeting = String(f.qGreeting || "").split("{{client}}").join(f.clientName || "");
+
+  const rows = items.map(i => {
+    const q = Number(i.qty) || 0, u = Number(i.unit) || 0, t = q * u;
+    return `<tr><td class="desc">${esc2(i.desc)}</td><td>${q}</td><td>${nis(u)}</td><td>${nis(t)}</td><td>${nis(t * 1.18)}</td></tr>`;
+  }).join("");
+
+  const totalRow = items.length
+    ? `<tr class="tot"><td class="desc">סה״כ</td><td></td><td></td><td>${nis(sub)}</td><td>${nis(withVat)}</td></tr>` : "";
+
+  const extraRows = extras.map(i =>
+    `<tr><td class="desc">${esc2(i.desc)}</td><td></td><td>${esc2(i.note)}</td><td></td><td></td></tr>`).join("");
+
+  return `<div class="q">
+<h1>הצעת מחיר</h1>
+<table class="meta"><tr>
+  <th>לכבוד</th><td>${esc2(f.clientName)}</td>
+  <th>תאריך</th><td>${fmtIL(f.qDate)}</td>
+</tr></table>
+${greeting ? `<p class="greet">${esc2(greeting)}</p>` : ""}
+${bullets.length ? `<h2>על מה דיברנו</h2><ul>${bullets.map((b, i) => `<li${i === 0 ? ' class="first"' : ""}>${esc2(b)}</li>`).join("")}</ul>` : ""}
+${items.length || extras.length ? `<h2>פירוט עלויות</h2>
+<table class="cost">
+  <thead><tr><th class="desc">תיאור השירות</th><th>כמות</th><th>מחיר ליחידה</th><th>סה״כ</th><th>סה״כ כולל מע״מ</th></tr></thead>
+  <tbody>${rows}${totalRow}${extraRows}</tbody>
+</table>
+<p class="vatnote">כל המחירים לפני מע״מ</p>` : ""}
+${f.qNote ? `<p class="qnote">${esc2(f.qNote)}</p>` : ""}
+</div>`;
+}
+
 function buildContractHTML(f, clauses) {
   const kind = f.contractType === "trial" ? "trial" : "package";
   const list = (clauses && clauses.length ? clauses : DEFAULT_CLAUSES)
@@ -2310,6 +2355,22 @@ ul { margin: 4px 0 10px; padding-right: 20px; }
 li { margin-bottom: 4px; }
 ul ul { margin: 4px 0; }
 .sign { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; }
+.q h1 { font-size: 22pt; font-weight: 800; text-align: center; margin: 0 0 18px; }
+.q h2 { font-size: 13pt; font-weight: 700; margin: 22px 0 6px; border-bottom: 1.5px solid #1f3d2f; padding-bottom: 4px; color: #1f3d2f; }
+.q p.greet { margin: 14px 0 0; text-align: right; }
+.q table.meta { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+.q table.meta th { background: #eef3f0; font-weight: 700; padding: 7px 10px; border: 1px solid #d4ded8; text-align: right; width: 70px; }
+.q table.meta td { padding: 7px 10px; border: 1px solid #d4ded8; text-align: right; }
+.q table.cost { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10pt; }
+.q table.cost thead th { background: #1f3d2f; color: #fff; font-weight: 700; padding: 8px 8px; text-align: center; }
+.q table.cost thead th.desc { text-align: right; }
+.q table.cost td { padding: 7px 8px; border-bottom: 1px solid #e3e8e5; text-align: center; }
+.q table.cost td.desc { text-align: right; }
+.q table.cost tr.tot td { font-weight: 700; border-top: 1.5px solid #1f3d2f; }
+.q p.vatnote { text-align: center; font-weight: 700; font-size: 9.5pt; color: #1f3d2f; margin: 6px 0 0; }
+.q p.qnote { font-weight: 700; text-align: center; margin: 18px 0 0; padding-top: 12px; border-top: 1px solid #d4ded8; }
+.q ul { margin: 6px 0 0; padding-right: 22px; }
+.q li.first { list-style: "✦  "; }
 .sign p { margin: 0 0 5px; }
 @media screen {
   table.pw { max-width: 210mm; margin: 0 auto; }
@@ -2351,6 +2412,14 @@ function ctPage(bodyHtml, isSecond) {
 }
 
 function ctDocument(f, clauses, forPrint) {
+  if (f.contractType === "quote") {
+    const page = `<table class="pw">
+  <thead><tr><td><div class="hdr"><img src="${LOGO_B64}" alt="אולפני הנסיכה"></div></td></tr></thead>
+  <tfoot><tr><td>${QUOTE_FOOTER}</td></tr></tfoot>
+  <tbody><tr><td>${buildQuoteHTML(f)}<div class="tail"></div></td></tr></tbody>
+</table>`;
+    return `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>הצעת מחיר - ${f.clientName}</title><style>${CT_CSS}</style></head><body>${page}${forPrint ? "<script>" + CT_PAD_JS + "<\/script>" : ""}</body></html>`;
+  }
   const { part1, part2 } = buildContractHTML(f, clauses);
   return `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>הסכם - ${f.clientName}</title><style>${CT_CSS}</style></head><body>${ctPage(part1, false)}${ctPage(part2, true)}${forPrint ? "<script>" + CT_PAD_JS + "<\/script>" : ""}</body></html>`;
 }
@@ -2396,6 +2465,12 @@ function ContractGenerator({ leads }) {
     reelsPer: 1, reelsType: "רגילים", reelLength: 90, subtitles: true,
     price: 7000, payments: 1, validUntil: "", weeks: 26, signDate: new Date().toISOString().split("T")[0],
     recDate: "", recTime: "", deliveryHours: 72, duration: 1,
+    qDate: new Date().toISOString().split("T")[0],
+    qGreeting: "היי {{client}}, כיף שבחרתן ליצור איתנו! ריכזנו כאן את כל מה שדיברנו בטלפון.",
+    qBullets: "",
+    qItems: [{ desc: "", qty: 1, unit: "" }],
+    qExtras: [],
+    qNote: "",
   });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const [showPreview, setShowPreview] = useState(false);
@@ -2449,6 +2524,11 @@ function ContractGenerator({ leads }) {
 
   const isTrial = f.contractType === "trial";
   const isShort = f.contractType === "short";
+  const isQuote = f.contractType === "quote";
+  const setRow = (key, i, patch) => setF(p => ({ ...p, [key]: p[key].map((r, j) => j === i ? { ...r, ...patch } : r) }));
+  const addRow = (key, blank) => setF(p => ({ ...p, [key]: [...p[key], blank] }));
+  const delRow = (key, i) => setF(p => ({ ...p, [key]: p[key].filter((_, j) => j !== i) }));
+  const qSub = (f.qItems || []).reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unit) || 0), 0);
   const isSingle = isTrial || isShort;
   const vat = Math.round(f.price * 1.18);
   const splits = PAY_SPLITS[f.payments] || PAY_SPLITS[1];
@@ -2510,7 +2590,57 @@ function ContractGenerator({ leads }) {
                 onClick={() => { setCopied(false); setF(p => ({ ...p, contractType: t.id, price: t.id === "package" ? 7000 : 550, participants: t.id === "package" ? 4 : 2, payments: 1 })); }}>{t.label}</button>
             ))}
           </div>
-          <div style={S.grid2}>
+          {isQuote && <>
+            <div style={S.grid2}>
+              <div><label style={S.lbl}>לכבוד *</label><input style={S.inp} value={f.clientName} onChange={e => set("clientName", e.target.value)} placeholder="שם הלקוח" list="leadNames" /><datalist id="leadNames">{clientNames.map(n => <option key={n} value={n} />)}</datalist></div>
+              <div><label style={S.lbl}>תאריך</label><input style={S.inp} type="date" value={f.qDate} onChange={e => set("qDate", e.target.value)} dir="ltr" /></div>
+              <div style={S.full}><label style={S.lbl}>פתיח (אפשר להשתמש ב־{"{{client}}"})</label><textarea style={{ ...S.inp, minHeight: 54, fontFamily: "inherit", resize: "vertical" }} value={f.qGreeting} onChange={e => set("qGreeting", e.target.value)} /></div>
+              <div style={S.full}><label style={S.lbl}>על מה דיברנו — שורה לכל סעיף</label><textarea style={{ ...S.inp, minHeight: 110, fontFamily: "inherit", lineHeight: 1.8, resize: "vertical" }} value={f.qBullets} onChange={e => set("qBullets", e.target.value)} placeholder={"הקלטת שלושה פרקים\nהקלטת פתיח קבוע כולל מוזיקה ועריכתו לכל פרק"} /></div>
+            </div>
+
+            <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 8px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>פירוט עלויות</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 58px 80px 80px 26px", gap: 5, fontSize: 10, color: "#475569", marginBottom: 3 }}>
+              <span>תיאור השירות</span><span>כמות</span><span>מחיר ליחידה</span><span>סה״כ</span><span />
+            </div>
+            {(f.qItems || []).map((it, i) => {
+              const tot = (Number(it.qty) || 0) * (Number(it.unit) || 0);
+              return (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 58px 80px 80px 26px", gap: 5, marginBottom: 4, alignItems: "center" }}>
+                  <input style={{ ...S.inp, padding: "4px 8px", fontSize: 12 }} value={it.desc} onChange={e => setRow("qItems", i, { desc: e.target.value })} />
+                  <input style={{ ...S.inp, padding: "4px 6px", fontSize: 12 }} type="number" value={it.qty} onChange={e => setRow("qItems", i, { qty: e.target.value })} dir="ltr" />
+                  <input style={{ ...S.inp, padding: "4px 6px", fontSize: 12 }} type="number" value={it.unit} onChange={e => setRow("qItems", i, { unit: e.target.value })} dir="ltr" />
+                  <span style={{ fontSize: 12, color: "#94A3B8", direction: "ltr", textAlign: "left" }}>{tot ? "₪" + tot.toLocaleString() : ""}</span>
+                  <button style={{ ...S.iconBtn, color: "#64748B", fontSize: 12 }} onClick={() => delRow("qItems", i)} disabled={(f.qItems || []).length <= 1}>✕</button>
+                </div>
+              );
+            })}
+            <button style={{ ...S.btn2, padding: "3px 12px", fontSize: 11, marginTop: 2 }} onClick={() => addRow("qItems", { desc: "", qty: 1, unit: "" })}>+ שורה</button>
+            {qSub > 0 && <div style={{ marginTop: 8, padding: 8, background: "#0F172A", borderRadius: 8, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+              <span>סה״כ לפני מע״מ</span><span style={{ direction: "ltr" }}>₪{Math.round(qSub).toLocaleString()} · כולל מע״מ <strong style={{ color: "#10B981" }}>₪{Math.round(qSub * 1.18).toLocaleString()}</strong></span>
+            </div>}
+
+            <div style={{ fontSize: 13, fontWeight: 700, margin: "16px 0 6px", paddingTop: 12, borderTop: "1px solid #1E293B" }}>שורות ללא תמחור קבוע</div>
+            <div style={{ fontSize: 10, color: "#475569", marginBottom: 5 }}>למשל: כתוביות פרק מלא · ~250-300₪</div>
+            {(f.qExtras || []).map((it, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 120px 26px", gap: 5, marginBottom: 4, alignItems: "center" }}>
+                <input style={{ ...S.inp, padding: "4px 8px", fontSize: 12 }} value={it.desc} onChange={e => setRow("qExtras", i, { desc: e.target.value })} placeholder="תיאור" />
+                <input style={{ ...S.inp, padding: "4px 8px", fontSize: 12 }} value={it.note} onChange={e => setRow("qExtras", i, { note: e.target.value })} placeholder="~250-300₪" />
+                <button style={{ ...S.iconBtn, color: "#64748B", fontSize: 12 }} onClick={() => delRow("qExtras", i)}>✕</button>
+              </div>
+            ))}
+            <button style={{ ...S.btn2, padding: "3px 12px", fontSize: 11 }} onClick={() => addRow("qExtras", { desc: "", note: "" })}>+ שורה</button>
+
+            <div style={{ marginTop: 14 }}>
+              <label style={S.lbl}>הערה בתחתית המסמך</label>
+              <textarea style={{ ...S.inp, minHeight: 70, fontFamily: "inherit", resize: "vertical" }} value={f.qNote} onChange={e => set("qNote", e.target.value)} placeholder="למשל: התשלום על הפתיח יחולק ל-2..." />
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <button style={S.btn1} disabled={!f.clientName.trim()} onClick={() => setShowPreview(true)}>צפייה בהצעה ←</button>
+            </div>
+          </>}
+
+          {!isQuote && <><div style={S.grid2}>
             <div style={S.full}><label style={S.lbl}>שם הלקוח *</label>
               <input style={S.inp} value={f.clientName} onChange={e => set("clientName", e.target.value)} placeholder="שם מלא / שם חברה" list="leadNames" />
               <datalist id="leadNames">{clientNames.map(n => <option key={n} value={n} />)}</datalist>
@@ -2549,7 +2679,7 @@ function ContractGenerator({ leads }) {
 
           <div style={{ marginTop: 16 }}>
             <button style={S.btn1} disabled={!f.clientName.trim()} onClick={() => setShowPreview(true)}>{isShort ? "צור טקסט ←" : "צפייה בחוזה ←"}</button>
-          </div>
+          </div></>}
         </div>
       ) : (
         isShort ? (
@@ -2670,7 +2800,7 @@ function AppInner({onOut}){
     { id: "clients", label: "לקוחות" },
     { id: "tasks", label: "משימות" },
     { id: "stats", label: "נתונים" },
-    { id: "contracts", label: "צור חוזה" },
+    { id: "contracts", label: "צור מסמך" },
   ];
   const FIN_TABS = [
     { id: "dashboard", label: "דאשבורד" },
