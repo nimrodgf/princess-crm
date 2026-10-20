@@ -2461,11 +2461,11 @@ function ClauseEditor({ clause, onSave, onReset, saving }) {
 
 // מייצר PDF בשרת ומחזיר Blob — אותו HTML בדיוק שההדפסה משתמשת בו
 async function renderPdfBlob(html, filename) {
-  const res = await fetch("/api/pdf", {
+  // authedFetch מחדש טוקן שפג תוקפו ומנסה שוב פעם אחת
+  const res = await authedFetch("/api/pdf", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken()}` },
     body: JSON.stringify({ html, filename }),
-  });
+  }, { "Content-Type": "application/json" });
   if (!res.ok) {
     let msg = res.status + "";
     try { const j = await res.json(); if (j.error) msg = j.error; } catch (e) {}

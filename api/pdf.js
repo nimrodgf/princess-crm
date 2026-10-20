@@ -8,17 +8,18 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "https://lbqscxwfttiduofjjmyt.s
 const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || "";
 
 // מוודא שהבקשה הגיעה ממשתמש מחובר, כדי שהנקודה לא תהיה פתוחה לכל העולם
+// מחזיר null כשהבקשה מורשית, אחרת סיבת הדחייה
 async function verifyUser(req) {
   const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return false;
+  if (!auth.startsWith("Bearer ")) return "missing token";
   const token = auth.slice(7);
-  if (!SUPABASE_ANON) return true; // לא הוגדר מפתח — מדלגים על הבדיקה
+  if (!SUPABASE_ANON) return null; // לא הוגדר מפתח — מדלגים על הבדיקה
   try {
     const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${token}` },
     });
-    return r.ok;
-  } catch (e) { return false; }
+    return r.ok ? null : `supabase ${r.status}`;
+  } catch (e) { return "supabase unreachable"; }
 }
 
 export default async function handler(req, res) {
@@ -26,8 +27,9 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "POST only" });
     return;
   }
-  if (!(await verifyUser(req))) {
-    res.status(401).json({ error: "unauthorized" });
+  const denied = await verifyUser(req);
+  if (denied) {
+    res.status(401).json({ error: "unauthorized (" + denied + ")" });
     return;
   }
 
